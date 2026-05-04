@@ -1,0 +1,175 @@
+{
+  "identifier" : "SellFace StoreKit Configuration",
+  "nonConsumableProducts" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1001",
+      "localizations" : [
+        {
+          "description" : "Sharp business headshots in professional environments",
+          "displayName" : "Professional",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.professional",
+      "referenceName" : "Professional",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1002",
+      "localizations" : [
+        {
+          "description" : "Relaxed everyday looks",
+          "displayName" : "Casual",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.casual",
+      "referenceName" : "Casual",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1003",
+      "localizations" : [
+        {
+          "description" : "C-suite authority looks",
+          "displayName" : "Executive",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.executive",
+      "referenceName" : "Executive",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1004",
+      "localizations" : [
+        {
+          "description" : "Standout creator content",
+          "displayName" : "Creator",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.creator",
+      "referenceName" : "Creator",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1005",
+      "localizations" : [
+        {
+          "description" : "Profile-ready LinkedIn portraits",
+          "displayName" : "LinkedIn",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.linkedin",
+      "referenceName" : "LinkedIn",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1006",
+      "localizations" : [
+        {
+          "description" : "Classic aristocratic old money vibes",
+          "displayName" : "Old Money",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.oldmoney",
+      "referenceName" : "Old Money",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1007",
+      "localizations" : [
+        {
+          "description" : "High-trust, high-conversion sales portraits",
+          "displayName" : "Sales",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.sales",
+      "referenceName" : "Sales",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "1008",
+      "localizations" : [
+        {
+          "description" : "Premium studio lighting headshots",
+          "displayName" : "Studio",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.style.studio",
+      "referenceName" : "Studio",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "2001",
+      "localizations" : [
+        {
+          "description" : "Unlock any 2 style bundles",
+          "displayName" : "2 Styles Bundle",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.bundle.two_styles",
+      "referenceName" : "2 Styles Bundle",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "14.99",
+      "familyShareable" : false,
+      "internalID" : "2002",
+      "localizations" : [
+        {
+          "description" : "Unlock all style bundles forever",
+          "displayName" : "All Access",
+          "locale" : "en_GB"
+        }
+      ],
+      "productID" : "com.sellface.bundle.all_access",
+      "referenceName" : "All Access",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInReview" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_customerCancellationEnabled" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_GB",
+    "_storefront" : "GBR",
+    "_storeKitErrors" : [
+      {
+        "current" : 0,
+        "enabled" : false,
+        "error" : "et",
+        "total" : 0
+      }
+    ]
+  },
+  "version" : {
+    "major" : 2,
+    "minor" : 0
+  }
+}

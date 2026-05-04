@@ -1,0 +1,35 @@
+# ── Python / Backend ────────────────────────────────────────
+sellface-backend/.env
+sellface-backend/venv/
+sellface-backend/__pycache__/
+sellface-backend/**/__pycache__/
+sellface-backend/**/*.pyc
+sellface-backend/**/*.pyo
+sellface-backend/.pytest_cache/
+sellface-backend/*.egg-info/
+sellface-backend/dist/
+sellface-backend/build/
+sellface-backend/.coverage
+
+# ── Xcode / iOS ──────────────────────────────────────────────
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+.build/
+
+# ── macOS ────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Editor ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

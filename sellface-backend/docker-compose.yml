@@ -1,0 +1,121 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sellface
+      POSTGRES_PASSWORD: sellface
+      POSTGRES_DB: sellface
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sellface"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sellface:sellface@db:5432/sellface
+      DATABASE_URL_SYNC: postgresql+psycopg2://sellface:sellface@db:5432/sellface
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sellface:sellface@db:5432/sellface
+      DATABASE_URL_SYNC: postgresql+psycopg2://sellface:sellface@db:5432/sellface
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - .:/app
+
+  # Training worker — long-polling Astria tune status (Flux training ≈ 20 min)
+  worker-training:
+    build: .
+    command: celery -A app.celery_app worker --loglevel=info --queues=training --concurrency=4
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sellface:sellface@db:5432/sellface
+      DATABASE_URL_SYNC: postgresql+psycopg2://sellface:sellface@db:5432/sellface
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - .:/app
+
+  # Generation worker — polls Astria prompt status (generation ≈ 2–5 min)
+  worker-generation:
+    build: .
+    command: celery -A app.celery_app worker --loglevel=info --queues=generation --concurrency=4
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sellface:sellface@db:5432/sellface
+      DATABASE_URL_SYNC: postgresql+psycopg2://sellface:sellface@db:5432/sellface
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - .:/app
+
+  flower:
+    build: .
+    command: celery -A app.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

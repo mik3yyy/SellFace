@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellFace Admin</title>
+<style>
+  :root {
+    --bg: #07070f;
+    --surface: #11111c;
+    --surface2: #1c1c2c;
+    --surface3: #26263a;
+    --border: rgba(200,168,106,0.15);
+    --gold: #c8a86a;
+    --gold-dim: rgba(200,168,106,0.7);
+    --gold-bg: rgba(200,168,106,0.08);
+    --label: #f0eae0;
+    --sublabel: #8a8898;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --purple: #a78bfa;
+    --radius: 14px;
+    --font: -apple-system, 'SF Pro Rounded', 'SF Pro Display', BlinkMacSystemFont, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--label);
+    font-family: var(--font);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 24px 0;
+    z-index: 100;
+  }
+  .logo {
+    padding: 0 20px 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .logo-title {
+    font-size: 18px; font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+  .logo-sub { font-size: 11px; color: var(--sublabel); margin-top: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-radius: 0;
+    color: var(--sublabel);
+    font-size: 13px; font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--gold-bg); color: var(--label); }
+  .nav-item.active { color: var(--gold); background: var(--gold-bg); border-left-color: var(--gold); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .nav-spacer { flex: 1; }
+  .secret-input-wrap { padding: 12px 16px; border-top: 1px solid var(--border); }
+  .secret-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--label);
+    padding: 7px 10px;
+    font-size: 12px;
+    outline: none;
+  }
+  .secret-input::placeholder { color: var(--sublabel); }
+  .secret-input:focus { border-color: var(--gold); }
+
+  /* ── Main ── */
+  .main {
+    margin-left: 220px;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title {
+    font-size: 24px; font-weight: 700;
+    margin-bottom: 24px;
+    color: var(--label);
+  }
+
+  /* ── Stats cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .stat-label { font-size: 12px; color: var(--sublabel); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .stat-value { font-size: 32px; font-weight: 700; color: var(--gold); }
+  .stat-sub { font-size: 12px; color: var(--sublabel); margin-top: 4px; }
+
+  /* ── Breakdown cards ── */
+  .breakdown-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .breakdown-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .breakdown-title { font-size: 13px; font-weight: 600; color: var(--sublabel); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.6px; }
+  .breakdown-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-key { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .breakdown-val { font-size: 13px; font-weight: 600; color: var(--gold); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── Table ── */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .table-toolbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--label);
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+  }
+  .search-input:focus { border-color: var(--gold); }
+  .search-input::placeholder { color: var(--sublabel); }
+  .filter-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--label);
+    padding: 8px 10px;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--gold); }
+  .filter-select option { background: var(--surface2); }
+  .refresh-btn {
+    background: var(--gold-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--gold);
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .refresh-btn:hover { background: rgba(200,168,106,0.15); }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 11px; font-weight: 600;
+    color: var(--sublabel);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--gold-bg); }
+  .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: var(--sublabel); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .badge-ready    { background: rgba(74,222,128,0.12); color: var(--green); }
+  .badge-processing { background: rgba(200,168,106,0.12); color: var(--gold); }
+  .badge-completed { background: rgba(74,222,128,0.12); color: var(--green); }
+  .badge-uploading { background: rgba(251,191,36,0.12); color: var(--amber); }
+  .badge-queued   { background: rgba(96,165,250,0.12); color: var(--blue); }
+  .badge-draft    { background: rgba(138,136,152,0.12); color: var(--sublabel); }
+  .badge-failed   { background: rgba(248,113,113,0.12); color: var(--red); }
+  .table-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--sublabel);
+  }
+  .pagination { display: flex; gap: 6px; }
+  .page-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--label);
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .page-btn.active { border-color: var(--gold); color: var(--gold); }
+  .page-btn:hover { border-color: var(--gold-dim); }
+  .thumb {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    vertical-align: middle;
+    cursor: pointer;
+  }
+  .thumbs-cell { display: flex; gap: 4px; align-items: center; }
+  .thumb-more { font-size: 11px; color: var(--sublabel); margin-left: 2px; }
+  .empty-state {
+    padding: 48px;
+    text-align: center;
+    color: var(--sublabel);
+  }
+  .loading-state {
+    padding: 48px;
+    text-align: center;
+    color: var(--sublabel);
+  }
+  .spinner {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* edit button */
+  .edit-btn {
+    background: var(--gold-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--gold);
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .edit-btn:hover { background: rgba(200,168,106,0.15); }
+
+  /* edit modal */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+    width: 520px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-title {
+    font-size: 17px; font-weight: 700;
+    color: var(--gold);
+    margin-bottom: 20px;
+  }
+  .field-group { margin-bottom: 14px; }
+  .field-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--sublabel);
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin-bottom: 6px;
+  }
+  .field-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--label);
+    padding: 9px 12px;
+    font-size: 13px;
+    outline: none;
+    font-family: var(--font);
+  }
+  .field-input:focus { border-color: var(--gold); }
+  .field-input::placeholder { color: var(--sublabel); }
+  textarea.field-input { resize: vertical; min-height: 64px; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field-check { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--label); }
+  .field-check input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; }
+  .preview-img {
+    width: 80px; height: 80px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin-top: 8px;
+    display: none;
+  }
+  .modal-hint {
+    font-size: 11px;
+    color: var(--sublabel);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .modal-actions {
+    display: flex; gap: 10px; justify-content: flex-end;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+  .modal-cancel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--label);
+    padding: 9px 18px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .modal-save {
+    background: var(--gold);
+    border: none;
+    border-radius: 8px;
+    color: #1a1208;
+    padding: 9px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .modal-save:hover { opacity: 0.88; }
+  .modal-save:disabled { opacity: 0.5; cursor: default; }
+
+  /* image lightbox */
+  .lightbox {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 999;
+    align-items: center; justify-content: center;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 12px; }
+  .lightbox-close {
+    position: absolute; top: 20px; right: 24px;
+    font-size: 28px; color: white; cursor: pointer; opacity: 0.7;
+  }
+  .lightbox-close:hover { opacity: 1; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .nav-item span { display: none; }
+    .logo-title, .logo-sub, .secret-input-wrap { display: none; }
+    .main { margin-left: 60px; padding: 16px; }
+    .breakdown-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-title">SellFace</div>
+    <div class="logo-sub">Admin Dashboard</div>
+  </div>
+  <nav>
+    <div class="nav-item active" data-page="overview" onclick="navigate('overview', this)">
+      <span class="nav-icon">◈</span>
+      <span>Overview</span>
+    </div>
+    <div class="nav-item" data-page="users" onclick="navigate('users', this)">
+      <span class="nav-icon">◎</span>
+      <span>Users</span>
+    </div>
+    <div class="nav-item" data-page="personas" onclick="navigate('personas', this)">
+      <span class="nav-icon">⬡</span>
+      <span>Personas</span>
+    </div>
+    <div class="nav-item" data-page="jobs" onclick="navigate('jobs', this)">
+      <span class="nav-icon">⚙</span>
+      <span>Generation Jobs</span>
+    </div>
+    <div class="nav-item" data-page="styles" onclick="navigate('styles', this)">
+      <span class="nav-icon">✦</span>
+      <span>Style Bundles</span>
+    </div>
+  </nav>
+  <div class="nav-spacer"></div>
+  <div class="secret-input-wrap">
+    <input class="secret-input" type="password" id="secretInput" placeholder="Admin secret…" oninput="loadCurrentPage()" />
+  </div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Overview -->
+  <div id="page-overview" class="page active">
+    <div class="page-title">Overview</div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="loading-state"><div class="spinner"></div></div>
+    </div>
+    <div class="breakdown-grid" id="breakdownGrid"></div>
+  </div>
+
+  <!-- Users -->
+  <div id="page-users" class="page">
+    <div class="page-title">Users</div>
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <input class="search-input" type="text" id="userSearch" placeholder="Filter by device ID…" oninput="filterUsers()" />
+        <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+      <div id="usersTable"></div>
+      <div class="table-footer" id="usersFooter"></div>
+    </div>
+  </div>
+
+  <!-- Personas -->
+  <div id="page-personas" class="page">
+    <div class="page-title">Personas</div>
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <input class="search-input" type="text" id="personaSearch" placeholder="Filter by name…" oninput="filterPersonas()" />
+        <select class="filter-select" id="personaStatusFilter" onchange="loadPersonas()">
+          <option value="">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="uploading">Uploading</option>
+          <option value="processing">Processing</option>
+          <option value="ready">Ready</option>
+          <option value="failed">Failed</option>
+        </select>
+        <button class="refresh-btn" onclick="loadPersonas()">↻ Refresh</button>
+      </div>
+      <div id="personasTable"></div>
+      <div class="table-footer" id="personasFooter"></div>
+    </div>
+  </div>
+
+  <!-- Jobs -->
+  <div id="page-jobs" class="page">
+    <div class="page-title">Generation Jobs</div>
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <input class="search-input" type="text" id="jobSearch" placeholder="Filter by persona ID…" oninput="filterJobs()" />
+        <select class="filter-select" id="jobStatusFilter" onchange="loadJobs()">
+          <option value="">All statuses</option>
+          <option value="queued">Queued</option>
+          <option value="processing">Processing</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </select>
+        <button class="refresh-btn" onclick="loadJobs()">↻ Refresh</button>
+      </div>
+      <div id="jobsTable"></div>
+      <div class="table-footer" id="jobsFooter"></div>
+    </div>
+  </div>
+
+  <!-- Styles -->
+  <div id="page-styles" class="page">
+    <div class="page-title">Style Bundles</div>
+    <div class="table-wrap">
+      <div id="stylesTable"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Edit Style Modal -->
+<div class="modal-overlay" id="editModal" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal">
+    <div class="modal-title">✦ Edit Style Bundle</div>
+    <input type="hidden" id="editId"/>
+
+    <div class="field-row">
+      <div class="field-group">
+        <div class="field-label">Name</div>
+        <input class="field-input" id="editName" type="text" placeholder="e.g. Professional"/>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Sort Order</div>
+        <input class="field-input" id="editOrder" type="number" placeholder="0"/>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Description</div>
+      <textarea class="field-input" id="editDesc" placeholder="Short description shown in the app…"></textarea>
+    </div>
+
+    <div class="field-row">
+      <div class="field-group">
+        <div class="field-label">Display Price</div>
+        <input class="field-input" id="editPrice" type="text" placeholder="£2.99"/>
+        <div class="modal-hint">Shown in app UI only. Actual charge is set in App Store Connect via the StoreKit product ID.</div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">Was Price (strikethrough)</div>
+        <input class="field-input" id="editOldPrice" type="text" placeholder="£9.99"/>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Preview Image URL</div>
+      <input class="field-input" id="editImageUrl" type="url" placeholder="https://…"/>
+      <img id="editPreview" class="preview-img" alt="preview"/>
+      <div class="modal-hint">Paste any image URL to show a style preview in the app. Cloudinary or direct CDN links work best.</div>
+    </div>
+
+    <div class="field-group">
+      <label class="field-check">
+        <input type="checkbox" id="editActive"/>
+        Active — visible to users in the app
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeEditModal()">Cancel</button>
+      <button class="modal-save" id="saveStyleBtn" onclick="saveStyle()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">✕</span>
+  <img id="lightboxImg" src="" alt="" />
+</div>
+
+<script>
+const BASE = '';
+let _users = [], _personas = [], _jobs = [];
+
+function secret() { return document.getElementById('secretInput').value.trim(); }
+
+function headers() { return { 'X-Admin-Secret': secret() }; }
+
+async function api(path) {
+  const r = await fetch(BASE + path, { headers: headers() });
+  if (!r.ok) {
+    if (r.status === 401) return null;
+    throw new Error(await r.text());
+  }
+  return r.json();
+}
+
+function navigate(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-' + page).classList.add('active');
+  loadPage(page);
+}
+
+function loadCurrentPage() {
+  const active = document.querySelector('.nav-item.active');
+  if (active) loadPage(active.dataset.page);
+}
+
+function loadPage(page) {
+  if (page === 'overview') loadOverview();
+  else if (page === 'users') loadUsers();
+  else if (page === 'personas') loadPersonas();
+  else if (page === 'jobs') loadJobs();
+  else if (page === 'styles') loadStyles();
+}
+
+// ── Overview ──
+async function loadOverview() {
+  const grid = document.getElementById('statsGrid');
+  const breakdown = document.getElementById('breakdownGrid');
+  grid.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading…</div></div>';
+  breakdown.innerHTML = '';
+  const d = await api('/admin/overview');
+  if (!d) { grid.innerHTML = '<div class="empty-state">Enter admin secret to view data.</div>'; return; }
+
+  const statusColors = { ready: '#4ade80', processing: '#c8a86a', uploading: '#fbbf24', draft: '#8a8898', failed: '#f87171', queued: '#60a5fa', completed: '#4ade80' };
+
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value">${d.total_users}</div></div>
+    <div class="stat-card"><div class="stat-label">Personas</div><div class="stat-value">${d.total_personas}</div></div>
+    <div class="stat-card"><div class="stat-label">Generation Jobs</div><div class="stat-value">${d.total_jobs}</div></div>
+    <div class="stat-card"><div class="stat-label">Generated Images</div><div class="stat-value">${d.total_generated_images}</div></div>
+  `;
+
+  const personaRows = Object.entries(d.personas_by_status).map(([k, v]) =>
+    `<div class="breakdown-row"><div class="breakdown-key"><div class="dot" style="background:${statusColors[k]||'#888'}"></div>${k}</div><div class="breakdown-val">${v}</div></div>`
+  ).join('');
+  const jobRows = Object.entries(d.jobs_by_status).map(([k, v]) =>
+    `<div class="breakdown-row"><div class="breakdown-key"><div class="dot" style="background:${statusColors[k]||'#888'}"></div>${k}</div><div class="breakdown-val">${v}</div></div>`
+  ).join('');
+
+  breakdown.innerHTML = `
+    <div class="breakdown-card"><div class="breakdown-title">Personas by Status</div>${personaRows || '<div style="color:var(--sublabel);font-size:13px">No personas yet</div>'}</div>
+    <div class="breakdown-card"><div class="breakdown-title">Jobs by Status</div>${jobRows || '<div style="color:var(--sublabel);font-size:13px">No jobs yet</div>'}</div>
+  `;
+}
+
+// ── Users ──
+async function loadUsers() {
+  document.getElementById('usersTable').innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading…</div></div>';
+  const d = await api('/admin/users?per_page=100');
+  if (!d) { document.getElementById('usersTable').innerHTML = '<div class="empty-state">Enter admin secret to view data.</div>'; return; }
+  _users = d.users;
+  renderUsers(_users);
+  document.getElementById('usersFooter').innerHTML = `<span>${d.total} users total</span>`;
+}
+
+function filterUsers() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(_users.filter(u => (u.device_id||'').toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
+}
+
+function renderUsers(rows) {
+  if (!rows.length) { document.getElementById('usersTable').innerHTML = '<div class="empty-state">No users found.</div>'; return; }
+  document.getElementById('usersTable').innerHTML = `
+    <table>
+      <thead><tr><th>ID</th><th>Device ID</th><th>Personas</th><th>Created</th></tr></thead>
+      <tbody>${rows.map(u => `
+        <tr>
+          <td class="mono">${u.id.substring(0,8)}…</td>
+          <td class="mono" title="${u.device_id||''}">${(u.device_id||'—').substring(0,20)}${u.device_id && u.device_id.length > 20 ? '…' : ''}</td>
+          <td>${u.persona_count}</td>
+          <td>${fmtDate(u.created_at)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Personas ──
+async function loadPersonas() {
+  document.getElementById('personasTable').innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading…</div></div>';
+  const status = document.getElementById('personaStatusFilter').value;
+  const q = status ? `?status=${status}&per_page=100` : '?per_page=100';
+  const d = await api('/admin/personas' + q);
+  if (!d) { document.getElementById('personasTable').innerHTML = '<div class="empty-state">Enter admin secret to view data.</div>'; return; }
+  _personas = d.personas;
+  renderPersonas(_personas);
+  document.getElementById('personasFooter').innerHTML = `<span>${d.total} personas total</span>`;
+}
+
+function filterPersonas() {
+  const q = document.getElementById('personaSearch').value.toLowerCase();
+  renderPersonas(_personas.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)));
+}
+
+function renderPersonas(rows) {
+  if (!rows.length) { document.getElementById('personasTable').innerHTML = '<div class="empty-state">No personas found.</div>'; return; }
+  document.getElementById('personasTable').innerHTML = `
+    <table>
+      <thead><tr><th>Cover</th><th>Name</th><th>Status</th><th>Subject</th><th>Photos</th><th>Jobs</th><th>Astria ID</th><th>Created</th></tr></thead>
+      <tbody>${rows.map(p => `
+        <tr>
+          <td>${p.cover_image_url ? `<img class="thumb" src="${p.cover_image_url}" onclick="openLightbox('${p.cover_image_url}')" title="Cover photo"/>` : '<span style="color:var(--sublabel);font-size:18px">◌</span>'}</td>
+          <td><strong>${esc(p.name)}</strong></td>
+          <td><span class="badge badge-${p.status}">${p.status}</span></td>
+          <td>${p.subject_keyword}</td>
+          <td>${p.uploaded_image_count}</td>
+          <td>${p.generation_job_count}</td>
+          <td class="mono">${p.astria_tune_id||'—'}</td>
+          <td>${fmtDate(p.created_at)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Jobs ──
+async function loadJobs() {
+  document.getElementById('jobsTable').innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading…</div></div>';
+  const status = document.getElementById('jobStatusFilter').value;
+  const q = status ? `?status=${status}&per_page=100` : '?per_page=100';
+  const d = await api('/admin/jobs' + q);
+  if (!d) { document.getElementById('jobsTable').innerHTML = '<div class="empty-state">Enter admin secret to view data.</div>'; return; }
+  _jobs = d.jobs;
+  renderJobs(_jobs);
+  document.getElementById('jobsFooter').innerHTML = `<span>${d.total} jobs total</span>`;
+}
+
+function filterJobs() {
+  const q = document.getElementById('jobSearch').value.toLowerCase();
+  renderJobs(_jobs.filter(j => j.persona_id.toLowerCase().includes(q) || j.id.toLowerCase().includes(q)));
+}
+
+function renderJobs(rows) {
+  if (!rows.length) { document.getElementById('jobsTable').innerHTML = '<div class="empty-state">No jobs found.</div>'; return; }
+  document.getElementById('jobsTable').innerHTML = `
+    <table>
+      <thead><tr><th>ID</th><th>Status</th><th>Style</th><th>Images</th><th>Thumbnails</th><th>Error</th><th>Created</th><th>Completed</th></tr></thead>
+      <tbody>${rows.map(j => {
+        const thumbs = (j.images||[]).slice(0, 4).map(img =>
+          `<img class="thumb" src="${img.url}" onclick="openLightbox('${img.url}')" title="Generated image"/>`
+        ).join('');
+        const extra = j.image_count > 4 ? `<span class="thumb-more">+${j.image_count - 4}</span>` : '';
+        return `
+        <tr>
+          <td class="mono">${j.id.substring(0,8)}…</td>
+          <td><span class="badge badge-${j.status}">${j.status}</span></td>
+          <td>${esc(j.style_bundle_name||j.style_bundle_id.substring(0,8))}</td>
+          <td>${j.image_count}</td>
+          <td><div class="thumbs-cell">${thumbs}${extra}</div></td>
+          <td style="color:var(--red);max-width:180px" title="${esc(j.error_message||'')}">${j.error_message ? j.error_message.substring(0,40)+'…' : '—'}</td>
+          <td>${fmtDate(j.created_at)}</td>
+          <td>${j.completed_at ? fmtDate(j.completed_at) : '—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ── Styles ──
+let _styles = [];
+
+async function loadStyles() {
+  document.getElementById('stylesTable').innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Loading…</div></div>';
+  const d = await api('/admin/styles');
+  if (!d) { document.getElementById('stylesTable').innerHTML = '<div class="empty-state">Enter admin secret to view data.</div>'; return; }
+  _styles = d;
+  renderStyles(d);
+}
+
+function renderStyles(bundles) {
+  document.getElementById('stylesTable').innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>Preview</th><th>Name</th><th>Description</th><th>Display Price</th><th>Was</th><th>StoreKit ID</th><th>Active</th><th></th></tr></thead>
+      <tbody>${bundles.map(b => `
+        <tr id="style-row-${b.id}">
+          <td class="mono">${b.sort_order}</td>
+          <td>${b.preview_image_url ? `<img class="thumb" src="${esc(b.preview_image_url)}" onclick="openLightbox('${esc(b.preview_image_url)}')" title="Preview"/>` : `<span style="color:var(--sublabel);font-size:18px">◌</span>`}</td>
+          <td><strong>${esc(b.name)}</strong></td>
+          <td style="color:var(--sublabel);max-width:200px">${esc(b.description)}</td>
+          <td style="color:var(--gold);font-weight:600">${esc(b.price)}</td>
+          <td style="color:var(--sublabel);text-decoration:line-through;font-size:12px">${b.old_price ? esc(b.old_price) : '—'}</td>
+          <td class="mono" style="font-size:11px">${esc(b.product_id)}</td>
+          <td>${b.is_active ? '<span class="badge badge-ready">Active</span>' : '<span class="badge badge-draft">Inactive</span>'}</td>
+          <td><button class="edit-btn" onclick="openEditModal(${JSON.stringify(esc(b.id))})">Edit</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function openEditModal(bundleId) {
+  const b = _styles.find(s => s.id === bundleId);
+  if (!b) return;
+  document.getElementById('editId').value = b.id;
+  document.getElementById('editName').value = b.name;
+  document.getElementById('editDesc').value = b.description;
+  document.getElementById('editPrice').value = b.price;
+  document.getElementById('editOldPrice').value = b.old_price || '';
+  document.getElementById('editImageUrl').value = b.preview_image_url || '';
+  document.getElementById('editOrder').value = b.sort_order;
+  document.getElementById('editActive').checked = b.is_active;
+  document.getElementById('editPreview').src = b.preview_image_url || '';
+  document.getElementById('editPreview').style.display = b.preview_image_url ? 'block' : 'none';
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('editImageUrl').addEventListener('input', function() {
+    const prev = document.getElementById('editPreview');
+    prev.src = this.value;
+    prev.style.display = this.value ? 'block' : 'none';
+  });
+});
+
+async function saveStyle() {
+  const id = document.getElementById('editId').value;
+  const body = {
+    name: document.getElementById('editName').value,
+    description: document.getElementById('editDesc').value,
+    price: document.getElementById('editPrice').value,
+    old_price: document.getElementById('editOldPrice').value || null,
+    preview_image_url: document.getElementById('editImageUrl').value || null,
+    sort_order: parseInt(document.getElementById('editOrder').value) || 0,
+    is_active: document.getElementById('editActive').checked,
+  };
+  const saveBtn = document.getElementById('saveStyleBtn');
+  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true;
+  try {
+    const r = await fetch(`/admin/styles/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret() },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const updated = await r.json();
+    const idx = _styles.findIndex(s => s.id === id);
+    if (idx !== -1) _styles[idx] = updated;
+    renderStyles(_styles);
+    closeEditModal();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  } finally {
+    saveBtn.textContent = 'Save Changes';
+    saveBtn.disabled = false;
+  }
+}
+
+// ── Helpers ──
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = new Date(s);
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) +
+    ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+}
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function openLightbox(url) {
+  document.getElementById('lightboxImg').src = url;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// Initial load
+loadOverview();
+</script>
+</body>
+</html>
