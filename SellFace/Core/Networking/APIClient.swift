@@ -6,11 +6,17 @@ final class APIClient {
     var mockMode = false
 
     private let session: URLSession
+    private let uploadSession: URLSession  // longer timeout for multipart photo uploads
 
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 60
         session = URLSession(configuration: config)
+
+        let uploadConfig = URLSessionConfiguration.default
+        uploadConfig.timeoutIntervalForRequest = 120   // 2 min per individual photo
+        uploadConfig.timeoutIntervalForResource = 300  // 5 min total resource time
+        uploadSession = URLSession(configuration: uploadConfig)
     }
 
     // Persistent device UUID — used as X-Device-ID on every request
@@ -94,10 +100,10 @@ final class APIClient {
         addHeaders(to: &req)
         req.httpBody = multipartData.build(boundary: boundary)
 
-        let (data, response) = try await session.data(for: req)
+        let (data, response) = try await uploadSession.data(for: req)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let message = String(data: data, encoding: .utf8) ?? "Upload failed"
-            throw APIError.serverError(0, message)
+            throw APIError.serverError((response as? HTTPURLResponse)?.statusCode ?? 0, message)
         }
         return data
     }

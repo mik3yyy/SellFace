@@ -44,7 +44,7 @@ services:
 
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
       - "8000:8000"
     environment:
@@ -61,8 +61,12 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - .:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   # Training worker — long-polling Astria tune status (Flux training ≈ 20 min)
   worker-training:
@@ -82,8 +86,6 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - .:/app
 
   # Generation worker — polls Astria prompt status (generation ≈ 2–5 min)
   worker-generation:
@@ -103,16 +105,19 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    volumes:
-      - .:/app
 
+  # Flower — Celery task monitor. Set FLOWER_BASIC_AUTH=user:password in .env.
   flower:
     build: .
-    command: celery -A app.celery_app flower --port=5555
+    command: >
+      celery -A app.celery_app flower --port=5555
+      --basic_auth=${FLOWER_BASIC_AUTH:-admin:sellface-flower}
     ports:
       - "5555:5555"
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
+    env_file:
+      - .env
     depends_on:
       - redis
     restart: unless-stopped

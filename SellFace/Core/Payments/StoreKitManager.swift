@@ -1,6 +1,20 @@
 import StoreKit
 import Foundation
 
+enum StoreKitPurchaseError: LocalizedError {
+    case productNotFound
+    case verificationFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .productNotFound:
+            return "Couldn't load this purchase from the App Store. Make sure you're signed into your Apple ID in Settings and try again."
+        case .verificationFailed:
+            return "Purchase verification failed. Please contact support."
+        }
+    }
+}
+
 @MainActor
 final class StoreKitManager {
     static let shared = StoreKitManager()
@@ -21,9 +35,11 @@ final class StoreKitManager {
 
     func loadProducts() async {
         do {
-            products = try await Product.products(for: ProductID.all)
+            let loaded = try await Product.products(for: ProductID.all)
+            products = loaded.sorted { $0.price < $1.price }
+            print("[StoreKit] Loaded \(products.count) products: \(products.map(\.id))")
         } catch {
-            // Unavailable in sandbox without StoreKit config
+            print("[StoreKit] loadProducts failed: \(error)")
         }
     }
 
@@ -31,13 +47,27 @@ final class StoreKitManager {
         products.first { $0.id == productId }
     }
 
+    /// Returns the App Store–formatted local price string (e.g. "£2.99").
+    /// Falls back to nil if products haven't loaded yet.
+    func localizedPrice(for productId: String) -> String? {
+        product(for: productId)?.displayPrice
+    }
+
     func purchase(productId: String) async throws -> Bool {
-        guard let product = product(for: productId) else {
-            // Mock/sandbox fallback: grant locally without a real transaction
+        if APIClient.shared.mockMode {
             purchasedProductIDs.insert(productId)
             LocalStorageManager.shared.unlockBundle(productId: productId)
             return true
         }
+
+        // Load products if missing, retry once on transient failure
+        if products.isEmpty { await loadProducts() }
+        if products.isEmpty { await loadProducts() }
+
+        guard let product = product(for: productId) else {
+            throw StoreKitPurchaseError.productNotFound
+        }
+
         let result = try await product.purchase()
         switch result {
         case .success(let verification):
@@ -64,7 +94,9 @@ final class StoreKitManager {
     }
 
     func updatePurchasedProducts() async {
-        var purchased = LocalStorageManager.shared.loadUnlockedBundles()
+        // StoreKit currentEntitlements is the source of truth.
+        // Start empty so stale local data (e.g. from mock mode) never bleeds in.
+        var purchased = Set<String>()
         for await result in Transaction.currentEntitlements {
             if let transaction = try? checkVerified(result) {
                 purchased.insert(transaction.productID)
@@ -82,7 +114,6 @@ final class StoreKitManager {
     }
 
     private func listenForTransactions() -> Task<Void, Never> {
-        // Inherit MainActor isolation so self can be accessed directly
         Task { @MainActor in
             for await result in Transaction.updates {
                 if let transaction = try? self.checkVerified(result) {

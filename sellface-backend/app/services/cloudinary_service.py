@@ -9,21 +9,19 @@ import cloudinary.uploader
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
-
-def _configure():
-    cloudinary.config(
-        cloud_name=settings.cloudinary_cloud_name,
-        api_key=settings.cloudinary_api_key,
-        api_secret=settings.cloudinary_api_secret,
-        secure=True,
-    )
+# Configure once at import time — credentials are immutable after startup.
+_settings = get_settings()
+cloudinary.config(
+    cloud_name=_settings.cloudinary_cloud_name,
+    api_key=_settings.cloudinary_api_key,
+    api_secret=_settings.cloudinary_api_secret,
+    secure=True,
+)
 
 
 def upload_bytes(data: bytes, folder: str, public_id: str | None = None) -> dict:
-    """Upload raw bytes. Returns Cloudinary response dict with 'secure_url' and 'public_id'."""
-    _configure()
+    """Upload raw bytes. Returns dict with 'url' and 'public_id'."""
     try:
         response = cloudinary.uploader.upload(
             io.BytesIO(data),
@@ -40,7 +38,6 @@ def upload_bytes(data: bytes, folder: str, public_id: str | None = None) -> dict
 
 def upload_url(image_url: str, folder: str) -> dict:
     """Upload from a remote URL. Useful for AI-generated images."""
-    _configure()
     try:
         response = cloudinary.uploader.upload(
             image_url,
@@ -54,7 +51,6 @@ def upload_url(image_url: str, folder: str) -> dict:
 
 
 def delete_image(public_id: str) -> None:
-    _configure()
     try:
         cloudinary.uploader.destroy(public_id)
     except Exception as e:

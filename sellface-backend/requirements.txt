@@ -21,8 +21,11 @@ pydantic==2.10.3
 cloudinary==1.41.0
 
 # HTTP
-httpx==0.28.1
+httpx[http2]==0.28.1
 requests==2.32.3
+
+# APNs push notifications
+PyJWT[crypto]==2.10.1
 
 # Settings / env
 python-dotenv==1.0.1

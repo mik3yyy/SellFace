@@ -22,12 +22,15 @@ from app.database_sync import SyncSessionLocal
 from app.models.generation_job import GenerationJob, GenerationStatus
 from app.models.generated_image import GeneratedImage
 from app.models.persona import Persona, PersonaStatus
+from app.models.user import User
+from app.models.device_token import DeviceToken
 from app.services import astria_service, cloudinary_service, notification_service
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 40      # × 30s = 20 minutes max for generation
-POLL_INTERVAL = 30    # seconds between Astria polls
+MAX_RETRIES = 150     # covers training wait (~90 × 60s) + generation polling (~40 × 30s)
+TRAINING_WAIT = 60    # seconds between training-completion checks
+POLL_INTERVAL = 30    # seconds between Astria generation polls
 
 
 @celery_app.task(
@@ -45,7 +48,7 @@ def process_generation_job(self, job_id: str) -> dict:
             .options(
                 joinedload(GenerationJob.persona).joinedload(Persona.images),
                 joinedload(GenerationJob.style_bundle),
-                joinedload(GenerationJob.user).joinedload(lambda u: u.device_tokens),
+                joinedload(GenerationJob.user).joinedload(User.device_tokens),
             )
             .where(GenerationJob.id == job_id)
         ).unique().scalar_one_or_none()
@@ -57,15 +60,21 @@ def process_generation_job(self, job_id: str) -> dict:
         if job.status == GenerationStatus.completed:
             return {"status": "already_completed"}
 
-        # ── Guard: persona must be trained ────────────────────────────────────
+        # ── Wait for training to complete before generating ───────────────────
+        # Training runs on the training worker in parallel; we just poll.
         if not job.persona.astria_tune_id:
-            raise RuntimeError(
-                f"Persona {job.persona_id} has no Astria tune — training must finish before generation"
+            logger.info(
+                "Persona %s training not yet submitted — waiting %ds",
+                job.persona_id, TRAINING_WAIT,
             )
+            raise self.retry(countdown=TRAINING_WAIT)
+
         if job.persona.status != PersonaStatus.ready:
-            raise RuntimeError(
-                f"Persona {job.persona_id} is not ready (status={job.persona.status}) — cannot generate yet"
+            logger.info(
+                "Persona %s still training (status=%s) — waiting %ds",
+                job.persona_id, job.persona.status, TRAINING_WAIT,
             )
+            raise self.retry(countdown=TRAINING_WAIT)
 
         tune_id = job.persona.astria_tune_id
 

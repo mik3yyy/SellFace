@@ -27,8 +27,17 @@ final class NotificationManager: NSObject {
     }
 
     private func registerTokenWithBackend(_ token: String) async {
-        // TODO: Send token to backend POST /devices/register-token
-        // try await APIClient.shared.request(endpoint: .registerDeviceToken, body: ["token": token], responseType: EmptyResponse.self)
+        guard !APIClient.shared.mockMode else { return }
+        do {
+            _ = try await APIClient.shared.request(
+                endpoint: .registerDeviceToken,
+                body: DeviceTokenRequest(token: token),
+                responseType: EmptyResponse.self
+            )
+        } catch {
+            // Non-fatal — push notifications will still work on next launch if this fails.
+            print("[NotificationManager] Failed to register device token: \(error)")
+        }
     }
 
     func scheduleLocalNotification(title: String, body: String, delay: TimeInterval = 1) {

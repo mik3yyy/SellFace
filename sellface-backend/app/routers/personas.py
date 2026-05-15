@@ -145,16 +145,10 @@ async def upload_persona_images(
             persona.cover_image_url = upload_result["url"]
 
     total_images = existing_count + len(saved)
-
-    if total_images >= MIN_IMAGES and not persona.astria_tune_id:
-        # Enough photos — kick off Astria training
-        persona.status = PersonaStatus.processing
-        await db.commit()
-        _dispatch_training(persona_id)
-        logger.info("Dispatched Astria training for persona %s (%d images)", persona_id, total_images)
-    else:
-        persona.status = PersonaStatus.draft if total_images < MIN_IMAGES else PersonaStatus.processing
-        await db.commit()
+    # Stay in draft — training is triggered later when the user picks a style.
+    persona.status = PersonaStatus.draft
+    await db.commit()
+    logger.info("Persona %s has %d/%d images uploaded", persona_id, total_images, MIN_IMAGES)
 
     return [PersonaImageOut.model_validate(i) for i in saved]
 
@@ -194,7 +188,3 @@ async def _upload_to_cloudinary(data: bytes, persona_id: str, image_id: str) -> 
     )
 
 
-def _dispatch_training(persona_id: str) -> None:
-    from app.tasks.training import train_persona
-    task = train_persona.apply_async(args=[persona_id], queue="training")
-    logger.info("Queued training task %s for persona %s", task.id, persona_id)

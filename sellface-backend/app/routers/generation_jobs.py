@@ -17,6 +17,8 @@ from app.tasks.generation import process_generation_job
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/generation-jobs", tags=["generation_jobs"])
 
+MIN_IMAGES = 10  # must match personas.py
+
 
 @router.post("", response_model=GenerationJobOut, status_code=status.HTTP_201_CREATED)
 async def create_generation_job(
@@ -24,7 +26,6 @@ async def create_generation_job(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    # Validate persona belongs to user and has enough images
     persona_result = await db.execute(
         select(Persona)
         .where(Persona.id == body.persona_id, Persona.user_id == user.id)
@@ -33,12 +34,17 @@ async def create_generation_job(
     persona = persona_result.scalar_one_or_none()
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
-    if persona.status not in (PersonaStatus.ready, PersonaStatus.processing):
-        raise HTTPException(status_code=422, detail=f"Persona is not ready (status: {persona.status})")
-    if len(persona.images) < 1:
-        raise HTTPException(status_code=422, detail="Persona has no uploaded images")
 
-    # Validate style bundle exists
+    if persona.status == PersonaStatus.failed:
+        raise HTTPException(status_code=422, detail="Persona failed — please create a new one")
+
+    if persona.status == PersonaStatus.draft:
+        if len(persona.images) < MIN_IMAGES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Need at least {MIN_IMAGES} photos before generating. Currently have {len(persona.images)}.",
+            )
+
     style_result = await db.execute(
         select(StyleBundle).where(StyleBundle.id == body.style_bundle_id, StyleBundle.is_active == True)
     )
@@ -46,7 +52,7 @@ async def create_generation_job(
     if not style:
         raise HTTPException(status_code=404, detail="Style bundle not found")
 
-    # Check for duplicate in-progress job
+    # Idempotency: if an in-progress job already exists for this persona+style, return it
     dup = await db.execute(
         select(GenerationJob).where(
             GenerationJob.persona_id == body.persona_id,
@@ -54,8 +60,17 @@ async def create_generation_job(
             GenerationJob.status.in_([GenerationStatus.queued, GenerationStatus.processing]),
         )
     )
-    if dup.scalar_one_or_none():
+    existing = dup.scalar_one_or_none()
+    if existing:
         raise HTTPException(status_code=409, detail="A job for this persona + style is already in progress")
+
+    # If persona has photos but training hasn't started yet, kick it off now.
+    if persona.status == PersonaStatus.draft and not persona.astria_tune_id:
+        from app.tasks.training import train_persona
+        persona.status = PersonaStatus.processing
+        await db.commit()
+        task = train_persona.apply_async(args=[persona.id], queue="training")
+        logger.info("Started training for persona %s (task=%s) on first style selection", persona.id, task.id)
 
     job = GenerationJob(
         id=str(uuid.uuid4()),
@@ -68,12 +83,11 @@ async def create_generation_job(
     await db.commit()
     await db.refresh(job)
 
-    # Dispatch Celery task
     task = process_generation_job.apply_async(args=[job.id], queue="generation")
     job.celery_task_id = task.id
     await db.commit()
 
-    logger.info("Queued generation job %s (task %s)", job.id, task.id)
+    logger.info("Queued generation job %s (task=%s)", job.id, task.id)
     return GenerationJobOut.model_validate(job)
 
 

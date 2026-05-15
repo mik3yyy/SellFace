@@ -8,6 +8,7 @@ final class CreatePersonaViewModel {
     private(set) var isCreating = false
 
     var onImagesUpdated: (() -> Void)?
+    var onProgress: ((Int, Int) -> Void)?       // (uploaded, total)
     var onCreationComplete: ((Persona) -> Void)?
     var onError: ((String) -> Void)?
 
@@ -21,7 +22,8 @@ final class CreatePersonaViewModel {
     }
 
     func createPersona(name: String) {
-        guard !name.trimmingCharacters(in: .whitespaces).isEmpty else {
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmedName.isEmpty else {
             onError?("Please enter a name for this persona.")
             return
         }
@@ -35,30 +37,37 @@ final class CreatePersonaViewModel {
 
         Task {
             do {
-                // 1. Create persona on backend
-                let body = CreatePersonaBody(name: name, subjectKeyword: "person")
+                // Step 1: Create the persona record
                 let personaResponse = try await APIClient.shared.request(
                     endpoint: .createPersona,
-                    body: body,
+                    body: CreatePersonaBody(name: trimmedName, subjectKeyword: "person"),
                     responseType: PersonaResponse.self
                 )
 
-                // 2. Upload all images as multipart
-                var form = MultipartFormData()
-                for (i, image) in selectedImages.enumerated() {
-                    guard let jpeg = image.jpegData(compressionQuality: 0.7) else { continue }
-                    form.append(data: jpeg, name: "files", filename: "photo_\(i).jpg", mimeType: "image/jpeg")
-                }
-                _ = try await APIClient.shared.upload(
-                    endpoint: .uploadPersonaImages(personaId: personaResponse.id),
-                    multipartData: form
-                )
+                // Step 2: Upload photos one at a time — each request is small and fast
+                let total = selectedImages.count
+                for (index, image) in selectedImages.enumerated() {
+                    guard let jpeg = image.jpegData(compressionQuality: 0.75) else { continue }
 
-                // 3. Save persona locally (backend kicks off training automatically)
+                    var form = MultipartFormData()
+                    form.append(data: jpeg, name: "files", filename: "photo_\(index).jpg", mimeType: "image/jpeg")
+
+                    _ = try await APIClient.shared.upload(
+                        endpoint: .uploadPersonaImages(personaId: personaResponse.id),
+                        multipartData: form
+                    )
+
+                    onProgress?(index + 1, total)
+                }
+
+                // Step 3: Save first photo locally as cover thumbnail
                 var persona = personaResponse.toPersona()
-                // Save first image locally as cover thumbnail
                 if let first = selectedImages.first {
-                    let path = ImageStorageManager.shared.save(image: first, forPersonaId: persona.id, imageId: "cover")
+                    let path = ImageStorageManager.shared.save(
+                        image: first,
+                        forPersonaId: persona.id,
+                        imageId: "cover"
+                    )
                     persona.localCoverImagePath = path
                 }
                 LocalStorageManager.shared.savePersona(persona)

@@ -149,6 +149,16 @@ final class CreatePersonaViewController: UIViewController {
 
     // MARK: - Pinned bottom button (outside scrollView)
 
+    private let uploadProgressLabel: UILabel = {
+        let l = UILabel()
+        l.font = SFTypography.subheadline()
+        l.textColor = SFColors.secondaryLabel
+        l.textAlignment = .center
+        l.isHidden = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
     // Single action button that switches between "Pick" and "Create"
     private let actionButton = SFButton(title: "Choose Photos", style: .primary, systemImage: "photo.stack")
 
@@ -160,6 +170,7 @@ final class CreatePersonaViewController: UIViewController {
     }()
 
     private var isInCreateMode = false
+    private var buttonBottomConstraint: NSLayoutConstraint!
 
     // MARK: - Init
 
@@ -179,6 +190,12 @@ final class CreatePersonaViewController: UIViewController {
         photoPicker.delegate = self
         selectedPhotosCollectionView.dataSource = self
         navigationItem.backButtonDisplayMode = .minimal
+        registerKeyboardObservers()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Setup
@@ -188,12 +205,19 @@ final class CreatePersonaViewController: UIViewController {
         view.backgroundColor = SFColors.background
         navigationItem.largeTitleDisplayMode = .never
 
+        // Dismiss keyboard on tap or drag
+        scrollView.keyboardDismissMode = .interactive
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tap.cancelsTouchesInView = false
+        scrollView.addGestureRecognizer(tap)
+
         // Scroll view (body)
         view.addSubview(scrollView)
         scrollView.addSubview(contentStack)
 
         // Pinned bottom button + blur backdrop
         view.addSubview(buttonBackdrop)
+        view.addSubview(uploadProgressLabel)
         view.addSubview(actionButton)
 
         NSLayoutConstraint.activate([
@@ -209,16 +233,20 @@ final class CreatePersonaViewController: UIViewController {
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -(SFSpacing.buttonHeight + SFSpacing.xxl)),
             contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -SFSpacing.md * 2),
 
+            // Progress label sits just above the button
+            uploadProgressLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: SFSpacing.md),
+            uploadProgressLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -SFSpacing.md),
+            uploadProgressLabel.bottomAnchor.constraint(equalTo: actionButton.topAnchor, constant: -SFSpacing.sm),
+
             // Button pinned to bottom
             actionButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: SFSpacing.md),
             actionButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -SFSpacing.md),
-            actionButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -SFSpacing.md),
             actionButton.heightAnchor.constraint(equalToConstant: SFSpacing.buttonHeight),
 
             buttonBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             buttonBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             buttonBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            buttonBackdrop.topAnchor.constraint(equalTo: actionButton.topAnchor, constant: -SFSpacing.md),
+            buttonBackdrop.topAnchor.constraint(equalTo: actionButton.topAnchor, constant: -SFSpacing.xl),
         ])
 
         // Content
@@ -236,6 +264,9 @@ final class CreatePersonaViewController: UIViewController {
         contentStack.addArrangedSubview(makeFullWidthScroll(selectedPhotosCollectionView, height: 88))
         contentStack.addArrangedSubview(nameFieldHeader)
         contentStack.addArrangedSubview(nameField)
+
+        buttonBottomConstraint = actionButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -SFSpacing.md)
+        buttonBottomConstraint.isActive = true
 
         actionButton.addTarget(self, action: #selector(didTapAction), for: .touchUpInside)
     }
@@ -351,15 +382,24 @@ final class CreatePersonaViewController: UIViewController {
         viewModel.onImagesUpdated = { [weak self] in
             self?.revealPostSelectionUI()
         }
+        viewModel.onProgress = { [weak self] uploaded, total in
+            guard let self else { return }
+            uploadProgressLabel.isHidden = false
+            uploadProgressLabel.text = "Uploading photo \(uploaded) of \(total)…"
+        }
         viewModel.onCreationComplete = { [weak self] persona in
-            self?.actionButton.setLoading(false)
-            self?.viewModel.coordinator?.showPersonaDetail(persona)
+            guard let self else { return }
+            actionButton.setLoading(false)
+            uploadProgressLabel.isHidden = true
+            viewModel.coordinator?.showPersonaDetail(persona)
         }
         viewModel.onError = { [weak self] message in
-            self?.actionButton.setLoading(false)
+            guard let self else { return }
+            actionButton.setLoading(false)
+            uploadProgressLabel.isHidden = true
             let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
-            self?.present(alert, animated: true)
+            self.present(alert, animated: true)
         }
     }
 
@@ -393,6 +433,39 @@ final class CreatePersonaViewController: UIViewController {
             if bottom.y > 0 { scrollView.setContentOffset(bottom, animated: true) }
             nameField.becomeFirstResponder()
         }
+    }
+
+    // MARK: - Keyboard
+
+    private func registerKeyboardObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let frame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+              let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+              let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
+        let overlap = frame.height - view.safeAreaInsets.bottom
+        buttonBottomConstraint.constant = -(overlap + SFSpacing.md)
+        UIView.animate(withDuration: duration, delay: 0, options: .init(rawValue: curveRaw << 16)) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        guard let info = notification.userInfo,
+              let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+              let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
+        buttonBottomConstraint.constant = -SFSpacing.md
+        UIView.animate(withDuration: duration, delay: 0, options: .init(rawValue: curveRaw << 16)) {
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
     }
 
     // MARK: - Actions

@@ -179,12 +179,10 @@ final class PersonaDetailHeaderView: UICollectionReusableView {
 
     func configure(persona: Persona) {
         switch persona.status {
-        case .ready:
-            statusLabel.text = "Your persona is ready. Choose a style bundle below."
+        case .ready, .draft:
+            statusLabel.text = "Photos ready. Tap a style to generate your AI headshots."
         case .processing, .uploading:
-            statusLabel.text = "Your images are being processed. Style bundles will be available shortly."
-        case .draft:
-            statusLabel.text = "Upload photos to activate this persona."
+            statusLabel.text = "Training your AI model — this takes about 20 minutes. You'll get a notification when done."
         case .failed:
             statusLabel.text = "Processing failed. Please try creating a new persona."
         }

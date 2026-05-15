@@ -38,9 +38,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Native iOS clients don't send CORS Origin headers, so this only affects
+# browser-based access (Swagger UI, admin dashboard). Restrict in production
+# by setting ALLOWED_ORIGINS in .env.
+_allowed_origins = (
+    ["*"] if settings.debug
+    else ["https://sellface.app", "https://www.sellface.app"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

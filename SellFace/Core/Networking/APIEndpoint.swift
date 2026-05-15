@@ -1,7 +1,20 @@
 import Foundation
 
 enum APIEndpoint {
-    static let baseURL = "http://localhost:8000"
+    // Reads API_BASE_URL from Info.plist (set via xcconfig / build settings).
+    // Debug builds default to localhost; Release builds require the key to be set.
+    static let baseURL: String = {
+        if let url = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
+           !url.isEmpty, url != "$(API_BASE_URL)" {
+            return url
+        }
+        #if DEBUG
+        return "http://localhost:8000"
+        #else
+        // Set API_BASE_URL in your Release xcconfig before shipping.
+        fatalError("API_BASE_URL is not set in Info.plist for Release builds")
+        #endif
+    }()
 
     case getStyles
     case createPersona

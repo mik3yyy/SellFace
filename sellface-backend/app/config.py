@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql+psycopg2://sellface:sellface@localhost:5432/sellface"
 
     # Redis / Celery
-    redis_url: str = "rediss://default:yourpassword@your-endpoint.upstash.io:6379"
+    redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/0"
 
@@ -31,10 +31,31 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     admin_secret: str = "change-admin-secret-in-production"
 
-    # APNs
+    # APNs — leave empty to disable push notifications
     apns_key_id: str = ""
     apns_team_id: str = ""
+    # Store the .p8 key content with literal \n between lines, e.g.:
+    #   APNS_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIGH...\n-----END PRIVATE KEY-----
+    apns_private_key: str = ""
     apns_bundle_id: str = "com.mike.SellFace"
+    apns_use_sandbox: bool = True  # set to false in production
+
+    @property
+    def apns_configured(self) -> bool:
+        return bool(self.apns_key_id and self.apns_team_id and self.apns_private_key)
+
+    @property
+    def apns_private_key_pem(self) -> str:
+        """Decode escaped newlines stored in env vars back to actual newlines."""
+        return self.apns_private_key.replace("\\n", "\n")
+
+    @property
+    def cloudinary_configured(self) -> bool:
+        return bool(self.cloudinary_cloud_name and self.cloudinary_api_key and self.cloudinary_api_secret)
+
+    @property
+    def astria_configured(self) -> bool:
+        return bool(self.astria_api_key)
 
 
 @lru_cache

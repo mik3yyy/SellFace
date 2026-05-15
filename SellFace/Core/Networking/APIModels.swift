@@ -66,3 +66,10 @@ struct GeneratedImageResponse: Codable {
     let id: String
     let imageUrl: String
 }
+
+struct DeviceTokenRequest: Encodable {
+    let token: String
+    let platform: String = "ios"
+}
+
+struct EmptyResponse: Decodable {}

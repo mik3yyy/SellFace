@@ -16,14 +16,11 @@ final class PersonaDetailViewModel {
     }
 
     func loadBundles() {
-        // Show mock bundles immediately while backend loads
-        let unlocked = LocalStorageManager.shared.loadUnlockedBundles()
+        let unlocked = StoreKitManager.shared.purchasedProductIDs
         styleBundles = StyleBundle.mockBundles.map { bundle in
             var b = bundle; b.isUnlocked = unlocked.contains(bundle.productId); return b
         }
         onBundlesUpdated?()
-
-        // Fetch real style IDs from backend (needed so generation jobs reference backend UUIDs)
         Task { await fetchStylesFromBackend() }
     }
 
@@ -33,14 +30,27 @@ final class PersonaDetailViewModel {
                 endpoint: .getStyles,
                 responseType: [StyleBundleResponse].self
             )
-            let unlocked = LocalStorageManager.shared.loadUnlockedBundles()
+            let unlocked = StoreKitManager.shared.purchasedProductIDs
             styleBundles = responses
                 .filter { $0.isActive }
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map { $0.toStyleBundle(unlocked: unlocked.contains($0.productId)) }
+            applyStoreKitPrices()
             onBundlesUpdated?()
         } catch {
-            // Keep mock bundles on network error
+            applyStoreKitPrices()
+        }
+    }
+
+    /// Replaces hardcoded backend price strings with real App Store localized prices.
+    private func applyStoreKitPrices() {
+        styleBundles = styleBundles.map { bundle in
+            guard let skPrice = StoreKitManager.shared.localizedPrice(for: bundle.productId) else {
+                return bundle
+            }
+            var b = bundle
+            b.price = skPrice
+            return b
         }
     }
 
@@ -83,5 +93,7 @@ final class PersonaDetailViewModel {
         }
     }
 
+    // Overlay blocks style selection only while training is actively running.
+    // draft = photos stored, ready for style tap; processing = training in flight.
     var isProcessing: Bool { persona.status == .processing || persona.status == .uploading }
 }
