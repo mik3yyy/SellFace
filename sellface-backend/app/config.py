@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 from functools import lru_cache
 
 
@@ -8,6 +9,19 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://sellface:sellface@localhost:5432/sellface"
     database_url_sync: str = "postgresql+psycopg2://sellface:sellface@localhost:5432/sellface"
+
+    @model_validator(mode="after")
+    def normalise_db_urls(self) -> "Settings":
+        # Render provides postgres:// or postgresql:// — attach correct async/sync drivers
+        def _fix(url: str, driver: str) -> str:
+            if url.startswith("postgres://"):
+                return f"postgresql+{driver}" + url[len("postgres"):]
+            if url.startswith("postgresql://"):
+                return f"postgresql+{driver}" + url[len("postgresql"):]
+            return url
+        self.database_url = _fix(self.database_url, "asyncpg")
+        self.database_url_sync = _fix(self.database_url_sync, "psycopg2")
+        return self
 
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
