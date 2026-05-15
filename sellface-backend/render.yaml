@@ -6,10 +6,10 @@ services:
     region: oregon
     plan: starter
     dockerfilePath: ./Dockerfile
-    # Run migrations then start the server
-    startCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
+      - key: SERVICE_ROLE
+        value: api
       - key: DATABASE_URL
         fromDatabase:
           name: sellface-db
@@ -66,8 +66,9 @@ services:
     region: oregon
     plan: starter
     dockerfilePath: ./Dockerfile
-    startCommand: celery -A app.celery_app worker --loglevel=info --queues=training --concurrency=2
     envVars:
+      - key: SERVICE_ROLE
+        value: worker-training
       - key: DATABASE_URL
         fromDatabase:
           name: sellface-db
@@ -117,8 +118,9 @@ services:
     region: oregon
     plan: starter
     dockerfilePath: ./Dockerfile
-    startCommand: celery -A app.celery_app worker --loglevel=info --queues=generation --concurrency=2
     envVars:
+      - key: SERVICE_ROLE
+        value: worker-generation
       - key: DATABASE_URL
         fromDatabase:
           name: sellface-db
