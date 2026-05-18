@@ -1,3 +1,4 @@
+import ssl
 from celery import Celery
 from app.config import get_settings
 
@@ -13,6 +14,9 @@ celery_app = Celery(
     ],
 )
 
+_ssl_opts = {"ssl_cert_reqs": ssl.CERT_NONE}
+_use_ssl = settings.celery_broker_url.startswith("rediss://")
+
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
@@ -26,4 +30,5 @@ celery_app.conf.update(
         "app.tasks.training.train_persona": {"queue": "training"},
         "app.tasks.generation.process_generation_job": {"queue": "generation"},
     },
+    **({"broker_use_ssl": _ssl_opts, "redis_backend_use_ssl": _ssl_opts} if _use_ssl else {}),
 )
