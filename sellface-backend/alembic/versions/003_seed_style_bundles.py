@@ -107,9 +107,16 @@ style_bundles_table = table(
 
 
 def upgrade() -> None:
-    op.bulk_insert(style_bundles_table, [
-        {**b, "is_active": True} for b in STYLE_BUNDLES
-    ])
+    conn = op.get_bind()
+    for b in STYLE_BUNDLES:
+        conn.execute(
+            sa.text(
+                "INSERT INTO style_bundles (id, name, description, product_id, price, preview_image_name, is_active, sort_order) "
+                "VALUES (:id, :name, :description, :product_id, :price, :preview_image_name, :is_active, :sort_order) "
+                "ON CONFLICT (product_id) DO UPDATE SET id = :id, name = :name"
+            ),
+            {**b, "is_active": True},
+        )
 
 
 def downgrade() -> None:

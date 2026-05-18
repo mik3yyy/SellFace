@@ -1,4 +1,5 @@
 import Foundation
+import StoreKit
 
 @MainActor
 final class PersonaDetailViewModel {
@@ -15,44 +16,58 @@ final class PersonaDetailViewModel {
         self.coordinator = coordinator
     }
 
+    // MARK: - Bundle loading (StoreKit only)
+
     func loadBundles() {
+        let products = StoreKitManager.shared.products
+        if products.isEmpty {
+            // Products still loading — wait for them, then build
+            styleBundles = []
+            onBundlesUpdated?()
+            Task {
+                await StoreKitManager.shared.loadProducts()
+                buildBundlesFromStoreKit()
+            }
+        } else {
+            buildBundlesFromStoreKit()
+        }
+    }
+
+    private func buildBundlesFromStoreKit() {
+        let products = StoreKitManager.shared.products   // sorted cheapest → most expensive
         let unlocked = StoreKitManager.shared.purchasedProductIDs
-        styleBundles = StyleBundle.mockBundles.map { bundle in
-            var b = bundle; b.isUnlocked = unlocked.contains(bundle.productId); return b
+
+        styleBundles = products.compactMap { product -> StyleBundle? in
+            // Static metadata: maps productId → backend id, icon, regular price
+            guard let meta = StyleBundle.staticMetadata.first(where: { $0.productId == product.id }) else {
+                return nil  // unknown product — skip
+            }
+
+            // Show strikethrough only when Apple is charging less than the regular price
+            let oldPrice: String?
+            if let regularStr = meta.regularPrice,
+               let regularVal = Decimal(string: regularStr.filter { $0.isNumber || $0 == "." }),
+               product.price < regularVal {
+                oldPrice = regularStr
+            } else {
+                oldPrice = nil
+            }
+
+            return StyleBundle(
+                id: meta.id,
+                name: product.displayName,
+                description: meta.description,
+                productId: product.id,
+                price: product.displayPrice,
+                oldPrice: oldPrice,
+                previewImageName: meta.previewImageName,
+                isUnlocked: unlocked.contains(product.id)
+            )
         }
         onBundlesUpdated?()
-        Task { await fetchStylesFromBackend() }
     }
 
-    private func fetchStylesFromBackend() async {
-        do {
-            let responses = try await APIClient.shared.request(
-                endpoint: .getStyles,
-                responseType: [StyleBundleResponse].self
-            )
-            let unlocked = StoreKitManager.shared.purchasedProductIDs
-            styleBundles = responses
-                .filter { $0.isActive }
-                .sorted { $0.sortOrder < $1.sortOrder }
-                .map { $0.toStyleBundle(unlocked: unlocked.contains($0.productId)) }
-            applyStoreKitPrices()
-            onBundlesUpdated?()
-        } catch {
-            applyStoreKitPrices()
-        }
-    }
-
-    /// Replaces hardcoded backend price strings with real App Store localized prices.
-    private func applyStoreKitPrices() {
-        styleBundles = styleBundles.map { bundle in
-            guard let skPrice = StoreKitManager.shared.localizedPrice(for: bundle.productId) else {
-                return bundle
-            }
-            var b = bundle
-            b.price = skPrice
-            return b
-        }
-    }
+    // MARK: - Bundle interaction
 
     func didTapBundle(_ bundle: StyleBundle) {
         if bundle.isUnlocked {
@@ -64,7 +79,7 @@ final class PersonaDetailViewModel {
 
     private func startGeneration(bundle: StyleBundle) async {
         do {
-            let body = CreateGenerationJobBody(personaId: persona.id, styleBundleId: bundle.id)
+            let body = CreateGenerationJobBody(personaId: persona.id, styleBundleId: bundle.productId)
             let job = try await APIClient.shared.request(
                 endpoint: .createGenerationJob,
                 body: body,
@@ -72,7 +87,6 @@ final class PersonaDetailViewModel {
             )
             coordinator?.showResults(persona: persona, bundle: bundle, jobId: job.id)
         } catch APIError.serverError(409, _) {
-            // Already in progress — go to results to poll existing job
             coordinator?.showResults(persona: persona, bundle: bundle, jobId: nil)
         } catch {
             onError?("Could not start generation: \(error.localizedDescription)")
@@ -84,7 +98,7 @@ final class PersonaDetailViewModel {
             let success = try await StoreKitManager.shared.purchase(productId: bundle.productId)
             if success {
                 LocalStorageManager.shared.unlockBundle(productId: bundle.productId)
-                loadBundles()
+                buildBundlesFromStoreKit()
                 onPurchaseComplete?(bundle)
                 await startGeneration(bundle: bundle)
             }
@@ -93,7 +107,5 @@ final class PersonaDetailViewModel {
         }
     }
 
-    // Overlay blocks style selection only while training is actively running.
-    // draft = photos stored, ready for style tap; processing = training in flight.
     var isProcessing: Bool { persona.status == .processing || persona.status == .uploading }
 }

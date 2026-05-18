@@ -45,8 +45,14 @@ async def create_generation_job(
                 detail=f"Need at least {MIN_IMAGES} photos before generating. Currently have {len(persona.images)}.",
             )
 
+    # Accept either the DB uuid (id) or the StoreKit product_id string
+    from sqlalchemy import or_
     style_result = await db.execute(
-        select(StyleBundle).where(StyleBundle.id == body.style_bundle_id, StyleBundle.is_active == True)
+        select(StyleBundle).where(
+            or_(StyleBundle.id == body.style_bundle_id,
+                StyleBundle.product_id == body.style_bundle_id),
+            StyleBundle.is_active == True,
+        )
     )
     style = style_result.scalar_one_or_none()
     if not style:
@@ -56,7 +62,7 @@ async def create_generation_job(
     dup = await db.execute(
         select(GenerationJob).where(
             GenerationJob.persona_id == body.persona_id,
-            GenerationJob.style_bundle_id == body.style_bundle_id,
+            GenerationJob.style_bundle_id == style.id,
             GenerationJob.status.in_([GenerationStatus.queued, GenerationStatus.processing]),
         )
     )
@@ -76,7 +82,7 @@ async def create_generation_job(
         id=str(uuid.uuid4()),
         user_id=user.id,
         persona_id=body.persona_id,
-        style_bundle_id=body.style_bundle_id,
+        style_bundle_id=style.id,
         status=GenerationStatus.queued,
     )
     db.add(job)
