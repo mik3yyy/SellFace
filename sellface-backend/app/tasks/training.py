@@ -15,7 +15,7 @@ import logging
 from app.celery_app import celery_app
 from app.database_sync import SyncSessionLocal
 from app.models.persona import Persona, PersonaStatus
-from app.services import astria_service
+from app.services import astria_service, cloudinary_service
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,20 @@ def train_persona(self, persona_id: str) -> dict:
         persona.status = PersonaStatus.ready
         db.commit()
         logger.info("Astria tune %s training complete — persona %s is ready", persona.astria_tune_id, persona_id)
+
+        # Delete training images from Cloudinary — Astria has baked them into
+        # the LoRA, so we no longer need the originals.
+        deleted = 0
+        for img in persona.images:
+            if img.cloudinary_public_id:
+                cloudinary_service.delete_image(img.cloudinary_public_id)
+                img.cloudinary_public_id = None
+                img.remote_url = None
+                deleted += 1
+        if deleted:
+            db.commit()
+            logger.info("Deleted %d training images from Cloudinary for persona %s", deleted, persona_id)
+
         return {"status": "ready", "tune_id": persona.astria_tune_id}
 
     except self.MaxRetriesExceededError:
