@@ -113,7 +113,7 @@ def upgrade() -> None:
             sa.text(
                 "INSERT INTO style_bundles (id, name, description, product_id, price, preview_image_name, is_active, sort_order) "
                 "VALUES (:id, :name, :description, :product_id, :price, :preview_image_name, :is_active, :sort_order) "
-                "ON CONFLICT (product_id) DO UPDATE SET id = :id, name = :name"
+                "ON CONFLICT (product_id) DO NOTHING"
             ),
             {**b, "is_active": True},
         )
