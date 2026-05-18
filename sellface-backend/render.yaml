@@ -27,7 +27,39 @@ services:
         value: com.mike.SellFace
       - key: APNS_USE_SANDBOX
         value: false
-      # Set these in the Render dashboard after first deploy:
+      # Set these in the Render dashboard:
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: ASTRIA_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+
+  - type: worker
+    name: sellface-worker
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SERVICE_ROLE
+        value: worker
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sellface-db
+          property: connectionString
+      - key: DATABASE_URL_SYNC
+        fromDatabase:
+          name: sellface-db
+          property: connectionString
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

@@ -75,8 +75,12 @@ async def create_generation_job(
         from app.tasks.training import train_persona
         persona.status = PersonaStatus.processing
         await db.commit()
-        task = train_persona.apply_async(args=[persona.id], queue="training")
-        logger.info("Started training for persona %s (task=%s) on first style selection", persona.id, task.id)
+        try:
+            task = train_persona.apply_async(args=[persona.id], queue="training")
+            logger.info("Started training for persona %s (task=%s) on first style selection", persona.id, task.id)
+        except Exception as e:
+            logger.error("Failed to queue training task for persona %s: %s", persona.id, e)
+            raise HTTPException(status_code=503, detail="Worker unavailable — please check REDIS_URL / CELERY_BROKER_URL env vars")
 
     job = GenerationJob(
         id=str(uuid.uuid4()),
@@ -89,11 +93,14 @@ async def create_generation_job(
     await db.commit()
     await db.refresh(job)
 
-    task = process_generation_job.apply_async(args=[job.id], queue="generation")
-    job.celery_task_id = task.id
-    await db.commit()
-
-    logger.info("Queued generation job %s (task=%s)", job.id, task.id)
+    try:
+        task = process_generation_job.apply_async(args=[job.id], queue="generation")
+        job.celery_task_id = task.id
+        await db.commit()
+        logger.info("Queued generation job %s (task=%s)", job.id, task.id)
+    except Exception as e:
+        logger.error("Failed to queue generation task for job %s: %s", job.id, e)
+        raise HTTPException(status_code=503, detail="Worker unavailable — please check REDIS_URL / CELERY_BROKER_URL env vars")
     return GenerationJobOut.model_validate(job)
 
 
