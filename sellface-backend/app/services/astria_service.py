@@ -22,50 +22,96 @@ settings = get_settings()
 STYLE_PROMPTS: dict[str, tuple[str, str]] = {
     # (positive_prompt, negative_prompt)
     "professional": (
-        "professional corporate headshot of {kw}, tailored business suit, white studio background, "
-        "soft box lighting, sharp focus, 4k, photorealistic, LinkedIn profile photo",
-        "blurry, low quality, cartoon, painting, deformed, bad anatomy, ugly, sunglasses, hat",
+        "professional corporate headshot photograph of {kw}, wearing a sharply tailored charcoal or navy business suit "
+        "with a crisp white dress shirt and subtle tie, confident neutral expression with direct eye contact, "
+        "clean light grey or white seamless studio backdrop, three-point soft box lighting with a hair light creating "
+        "a subtle rim on the shoulders, catch lights in both eyes, shallow depth of field with crisp focus on the eyes "
+        "and face, 85mm portrait lens, skin retouched but natural-looking, photorealistic DSLR quality, "
+        "suitable for Fortune 500 company website or board of directors page, 4K ultra sharp",
+        "blurry, out of focus, low quality, cartoon, painting, illustration, deformed face, bad anatomy, "
+        "extra fingers, sunglasses, hat, cap, casual clothing, t-shirt, hoodie, watermark, text, logo, "
+        "oversaturated, HDR, dramatic shadows, smiling too wide, teeth showing unnaturally",
     ),
     "casual": (
-        "casual lifestyle portrait of {kw}, relaxed natural smile, outdoors in a park, "
-        "golden hour lighting, bokeh background, wearing jeans and a t-shirt, photorealistic",
-        "blurry, low quality, formal, suit, deformed, bad anatomy, ugly",
+        "candid lifestyle portrait photograph of {kw}, wearing a well-fitted casual smart outfit such as clean "
+        "jeans, a fitted t-shirt or open collar shirt, relaxed and genuine warm smile, standing outdoors in a "
+        "bright urban street or lush green park setting, soft natural golden hour sunlight creating warm skin tones "
+        "and a creamy bokeh background with blurred greenery or architecture, slight head tilt showing personality, "
+        "50mm lens at f/1.8, shallow depth of field, natural skin tones, photorealistic lifestyle photography, "
+        "approachable and friendly energy, magazine editorial quality",
+        "blurry, low quality, formal suit, tie, deformed face, bad anatomy, extra fingers, ugly, "
+        "artificial lighting, studio background, stiff pose, watermark, text, overexposed, underexposed",
     ),
     "executive": (
-        "executive C-suite portrait of {kw}, power pose, expensive Italian suit, "
-        "luxury modern boardroom background, dramatic Rembrandt lighting, confident expression, "
-        "4k photorealistic, editorial photography",
-        "blurry, low quality, casual, deformed, bad anatomy, ugly, cartoon",
+        "high-end executive C-suite portrait photograph of {kw}, wearing a premium tailored Italian wool suit "
+        "in deep charcoal or midnight blue with a luxury silk tie and white pocket square, polished cufflinks visible, "
+        "commanding authoritative posture with arms crossed or hands clasped, sharp confident gaze projecting power "
+        "and credibility, set in a sleek modern corporate boardroom with floor-to-ceiling glass windows and city skyline "
+        "blurred behind, dramatic Rembrandt split lighting with strong key light and soft fill, subtle shadow on one side "
+        "of the face adding depth and gravitas, 85mm lens, ultra-sharp focus on eyes, photorealistic editorial "
+        "photography worthy of Forbes or Harvard Business Review cover, 4K",
+        "blurry, low quality, casual, jeans, t-shirt, hoodie, deformed face, bad anatomy, extra fingers, "
+        "cartoon, painting, watermark, text, smiling too much, overly cheerful, flat lighting, soft lighting, "
+        "amateur photography, plastic skin",
     ),
     "creator": (
-        "social media content creator portrait of {kw}, vibrant colorful background, "
-        "trendy streetwear outfit, ring light catchlights, energetic expression, "
-        "Instagram aesthetic, photorealistic",
-        "blurry, low quality, formal, suit, deformed, bad anatomy, ugly",
+        "vibrant social media content creator portrait photograph of {kw}, wearing a stylish trendy streetwear outfit "
+        "with bold colours — think oversized hoodie, graphic tee, or modern streetwear pieces with expressive accessories, "
+        "energetic and charismatic expression with a confident engaging smile and direct eye contact, set against a "
+        "vivid gradient or painted wall background in electric colours — neon purple, cobalt blue, or warm coral, "
+        "professional ring light creating perfect circular catch lights in both eyes, subtle rim backlight for separation, "
+        "35mm lens, vibrant punchy colour grading, high contrast lifestyle photography, TikTok and Instagram aesthetic, "
+        "editorial influencer photography quality, sharp and dynamic",
+        "blurry, low quality, formal, suit, tie, boring background, deformed face, bad anatomy, extra fingers, "
+        "dull colours, flat lighting, stiff pose, watermark, text, overexposed, amateur",
     ),
     "linkedin": (
-        "LinkedIn profile photo of {kw}, warm professional smile, smart business casual, "
-        "clean light grey background, soft studio lighting, trustworthy and approachable, "
-        "photorealistic, headshot",
-        "blurry, low quality, casual, deformed, bad anatomy, ugly, sunglasses",
+        "polished LinkedIn profile headshot photograph of {kw}, wearing smart business casual attire such as a "
+        "well-fitted blazer over a collared shirt or blouse in muted professional tones — navy, grey, or white, "
+        "warm genuine confident smile showing approachability and trustworthiness, direct friendly eye contact, "
+        "set against a clean neutral light grey or soft white studio backdrop, even flattering two-point soft box "
+        "studio lighting eliminating harsh shadows, subtle hair light for dimension, catch lights clearly visible "
+        "in both eyes, 85mm portrait lens, sharp focus on the eyes and face, natural skin tones, professional "
+        "headshot photographer quality, approachable credible and likeable, photorealistic 4K",
+        "blurry, low quality, casual, t-shirt, deformed face, bad anatomy, extra fingers, sunglasses, hat, "
+        "outdoor background, dramatic lighting, harsh shadows, watermark, text, overly serious, stern expression, "
+        "too much retouching, plastic skin",
     ),
     "old money": (
-        "old money aristocratic portrait of {kw}, wearing heritage tweed blazer, "
-        "English country estate background, oil painting lighting, sophisticated elegant posture, "
-        "photorealistic, painterly",
-        "blurry, low quality, modern, streetwear, deformed, bad anatomy, ugly",
+        "distinguished old money aristocratic portrait photograph of {kw}, wearing a heritage Savile Row tailored "
+        "tweed blazer or hacking jacket with a fine wool turtleneck or pressed Oxford shirt, a polished signet ring "
+        "subtly visible, refined elegant posture exuding understated wealth and generational class, set in a timeless "
+        "English countryside estate library or grand drawing room with rich wooden bookshelves, leather Chesterfield "
+        "sofa, and Persian rugs softly blurred in the background, warm candlelit Rembrandt portrait lighting with "
+        "a golden amber hue reminiscent of Old Master oil paintings, 85mm lens, shallow depth of field, film grain "
+        "texture, painterly photorealistic quality, editorial luxury lifestyle photography",
+        "blurry, low quality, modern streetwear, casual, sportswear, deformed face, bad anatomy, extra fingers, "
+        "cartoon, anime, watermark, text, harsh flash, neon colours, contemporary office background",
     ),
     "sales": (
-        "high-trust sales professional portrait of {kw}, warm confident smile, "
-        "business casual attire, modern glass office background, "
-        "approachable and credible expression, photorealistic",
-        "blurry, low quality, deformed, bad anatomy, ugly, sunglasses",
+        "high-trust professional sales portrait photograph of {kw}, wearing a sharp business casual outfit such as "
+        "a fitted blazer over a smart open-collar shirt in warm approachable tones — light blue, white, or soft grey, "
+        "a broad natural confident smile showing genuine warmth and credibility, open and inviting body language with "
+        "a slight forward lean conveying attentiveness, set in a bright modern glass-walled office with blurred "
+        "contemporary workspace in the background, clean bright three-point studio lighting creating an optimistic "
+        "and energetic feel, catch lights in both eyes, 85mm lens at f/2, shallow depth of field with tack-sharp "
+        "face, warm natural skin tones, photorealistic professional headshot quality, the kind of photo that makes "
+        "people immediately trust you and want to do business with you",
+        "blurry, low quality, deformed face, bad anatomy, extra fingers, sunglasses, hat, harsh shadows, "
+        "dark background, stern expression, crossed arms looking closed off, watermark, text, cartoon",
     ),
     "studio": (
-        "premium studio portrait of {kw}, dramatic chiaroscuro lighting, "
-        "pure black background, high contrast, deep shadows, editorial magazine photography, "
-        "4k, photorealistic",
-        "blurry, low quality, outdoor, colorful, deformed, bad anatomy, ugly",
+        "dramatic high-fashion studio portrait photograph of {kw}, wearing a sleek all-black or monochrome editorial "
+        "outfit — fitted black turtleneck, structured blazer, or minimalist couture styling, intense and commanding "
+        "expression with strong eye contact radiating confidence and presence, set against a pure jet-black seamless "
+        "background, cinematic chiaroscuro split lighting with a single powerful key light creating deep sculpted "
+        "shadows on one side of the face and a sharp metallic rim light on the opposite edge for dramatic separation, "
+        "subtle smoke or fog haze in background for atmosphere, 85mm lens at f/1.4, ultra-sharp focus on the eyes, "
+        "skin tones deep and rich, high contrast black-and-white capable, editorial Vogue or Dazed magazine quality, "
+        "award-winning portrait photography, 4K cinematic",
+        "blurry, low quality, outdoor setting, colourful background, casual clothes, t-shirt, deformed face, "
+        "bad anatomy, extra fingers, flat lighting, soft lighting, overexposed, amateur, watermark, text, smiling, "
+        "cheerful, bright colours",
     ),
 }
 
@@ -157,7 +203,7 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
         "prompt": {
             "text": positive,
             "negative_prompt": negative,
-            "num_images": settings.astria_images_per_job,
+            "num_images": settings.effective_images_per_job,
             "w": 768,
             "h": 1024,
             "steps": 30,

@@ -37,7 +37,11 @@ class Settings(BaseSettings):
     astria_api_key: str = ""
     astria_base_url: str = "https://api.astria.ai"
     astria_branch: str = "flux1"
-    astria_images_per_job: int = 8
+    astria_images_per_job: int = 8  # production default; overridden to 2 when debug=True
+
+    @property
+    def effective_images_per_job(self) -> int:
+        return 2 if self.debug else self.astria_images_per_job
 
     # App
     app_name: str = "SellFace API"
