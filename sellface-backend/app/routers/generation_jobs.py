@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,7 +13,7 @@ from app.models.persona import Persona, PersonaStatus
 from app.models.style_bundle import StyleBundle
 from app.models.generation_job import GenerationJob, GenerationStatus
 from app.schemas.generation_job import GenerationJobCreate, GenerationJobOut, GenerationJobDetailOut
-from app.tasks.generation import process_generation_job
+from app.services.task_runner import run_train_and_generate, run_generate_only
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/generation-jobs", tags=["generation_jobs"])
@@ -70,18 +71,6 @@ async def create_generation_job(
     if existing:
         raise HTTPException(status_code=409, detail="A job for this persona + style is already in progress")
 
-    # If persona has photos but training hasn't started yet, kick it off now.
-    if persona.status == PersonaStatus.draft and not persona.astria_tune_id:
-        from app.tasks.training import train_persona
-        persona.status = PersonaStatus.processing
-        await db.commit()
-        try:
-            task = train_persona.apply_async(args=[persona.id], queue="training")
-            logger.info("Started training for persona %s (task=%s) on first style selection", persona.id, task.id)
-        except Exception as e:
-            logger.error("Failed to queue training task for persona %s: %s", persona.id, e)
-            raise HTTPException(status_code=503, detail="Worker unavailable — please check REDIS_URL / CELERY_BROKER_URL env vars")
-
     job = GenerationJob(
         id=str(uuid.uuid4()),
         user_id=user.id,
@@ -93,14 +82,18 @@ async def create_generation_job(
     await db.commit()
     await db.refresh(job)
 
-    try:
-        task = process_generation_job.apply_async(args=[job.id], queue="generation")
-        job.celery_task_id = task.id
+    # Kick off background work — no Redis/Celery needed
+    if persona.status == PersonaStatus.draft and not persona.astria_tune_id:
+        # First time: train LoRA then generate
+        persona.status = PersonaStatus.processing
         await db.commit()
-        logger.info("Queued generation job %s (task=%s)", job.id, task.id)
-    except Exception as e:
-        logger.error("Failed to queue generation task for job %s: %s", job.id, e)
-        raise HTTPException(status_code=503, detail="Worker unavailable — please check REDIS_URL / CELERY_BROKER_URL env vars")
+        asyncio.create_task(run_train_and_generate(persona.id, job.id))
+        logger.info("Started train+generate background task for persona=%s job=%s", persona.id, job.id)
+    else:
+        # Already trained: just generate
+        asyncio.create_task(run_generate_only(job.id))
+        logger.info("Started generate background task for job=%s", job.id)
+
     return GenerationJobOut.model_validate(job)
 
 
