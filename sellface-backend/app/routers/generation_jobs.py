@@ -82,15 +82,18 @@ async def create_generation_job(
     await db.commit()
     await db.refresh(job)
 
-    # Kick off background work — no Redis/Celery needed
-    if persona.status == PersonaStatus.draft and not persona.astria_tune_id:
-        # First time: train LoRA then generate
-        persona.status = PersonaStatus.processing
-        await db.commit()
+    # Kick off background work — no Redis/Celery needed.
+    # Check astria_tune_id (not status) as the source of truth for whether training happened.
+    # A persona can be stuck in "processing" without a tune_id if a previous attempt failed.
+    if not persona.astria_tune_id:
+        # Training has never been submitted — run train → generate
+        if persona.status == PersonaStatus.draft:
+            persona.status = PersonaStatus.processing
+            await db.commit()
         asyncio.create_task(run_train_and_generate(persona.id, job.id))
         logger.info("Started train+generate background task for persona=%s job=%s", persona.id, job.id)
     else:
-        # Already trained: just generate
+        # Persona already has a trained LoRA — just generate
         asyncio.create_task(run_generate_only(job.id))
         logger.info("Started generate background task for job=%s", job.id)
 
