@@ -41,10 +41,12 @@ struct StyleBundleResponse: Codable {
     let sortOrder: Int
 
     func toStyleBundle(unlocked: Bool) -> StyleBundle {
-        StyleBundle(
+        let tagline = StyleBundle.staticMetadata.first(where: { $0.id == id })?.tagline ?? ""
+        return StyleBundle(
             id: id,
             name: name,
             description: description,
+            tagline: tagline,
             productId: productId,
             price: price,
             oldPrice: oldPrice,
@@ -57,6 +59,7 @@ struct StyleBundleResponse: Codable {
 struct GenerationJobResponse: Codable {
     let id: String
     let status: String
+    let phase: String?           // "training" | "generating" | "completed" | "failed"
     let personaId: String
     let styleBundleId: String
     let generatedImages: [GeneratedImageResponse]?

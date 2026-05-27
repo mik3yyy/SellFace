@@ -18,35 +18,7 @@ final class ResultsViewController: UIViewController {
         return cv
     }()
 
-    private let loadingView: UIView = {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        v.isHidden = true
-
-        let spinner = UIActivityIndicatorView(style: .large)
-        spinner.color = SFColors.accent
-        spinner.startAnimating()
-        spinner.translatesAutoresizingMaskIntoConstraints = false
-
-        let label = UILabel()
-        label.tag = 99
-        label.font = SFTypography.body()
-        label.textColor = SFColors.secondaryLabel
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-
-        v.addSubview(spinner)
-        v.addSubview(label)
-        NSLayoutConstraint.activate([
-            spinner.centerXAnchor.constraint(equalTo: v.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: v.centerYAnchor, constant: -24),
-            label.topAnchor.constraint(equalTo: spinner.bottomAnchor, constant: 16),
-            label.leadingAnchor.constraint(equalTo: v.leadingAnchor, constant: SFSpacing.xl),
-            label.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -SFSpacing.xl),
-        ])
-        return v
-    }()
+    private let loadingView = ResultsLoadingView()
 
     init(viewModel: ResultsViewModel) {
         self.viewModel = viewModel
@@ -67,16 +39,11 @@ final class ResultsViewController: UIViewController {
         let loading = viewModel.isLoading
         loadingView.isHidden = !loading
         collectionView.isHidden = loading
-
-        if let label = loadingView.viewWithTag(99) as? UILabel {
-            label.text = viewModel.statusMessage
-        }
+        loadingView.setMessage(viewModel.statusMessage, phase: viewModel.phase)
 
         if !loading && viewModel.images.isEmpty {
             loadingView.isHidden = false
-            if let spinner = loadingView.subviews.first(where: { $0 is UIActivityIndicatorView }) as? UIActivityIndicatorView {
-                spinner.stopAnimating()
-            }
+            loadingView.setFinished()
         }
 
         collectionView.reloadData()
@@ -107,6 +74,7 @@ final class ResultsViewController: UIViewController {
             loadingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
+        loadingView.translatesAutoresizingMaskIntoConstraints = false
         loadingView.isHidden = false
         collectionView.isHidden = true
     }
@@ -143,6 +111,127 @@ extension ResultsViewController: UICollectionViewDelegateFlowLayout {
         let spacing = SFSpacing.sm
         let width = (collectionView.bounds.width - inset * 2 - spacing) / 2
         return CGSize(width: width, height: width * 1.2)
+    }
+}
+
+// MARK: - Shimmer loading state
+
+private final class ResultsLoadingView: UIView {
+
+    private let scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.showsVerticalScrollIndicator = false
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        return sv
+    }()
+
+    private let grid: UIStackView = {
+        let s = UIStackView()
+        s.axis = .vertical
+        s.spacing = SFSpacing.sm
+        s.translatesAutoresizingMaskIntoConstraints = false
+        return s
+    }()
+
+    private let phaseBadge: UILabel = {
+        let l = UILabel()
+        l.font = SFTypography.captionMedium()
+        l.textAlignment = .center
+        l.layer.cornerRadius = 12
+        l.clipsToBounds = true
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let messageLabel: UILabel = {
+        let l = UILabel()
+        l.font = SFTypography.callout()
+        l.textColor = SFColors.secondaryLabel
+        l.textAlignment = .center
+        l.numberOfLines = 0
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+
+        // 4 rows × 2 = 8 shimmer placeholders — matches ASTRIA_IMAGES_PER_JOB
+        for _ in 0..<4 {
+            let row = UIStackView()
+            row.axis = .horizontal
+            row.spacing = SFSpacing.sm
+            row.distribution = .fillEqually
+            for _ in 0..<2 {
+                let card = SFCardView()
+                card.backgroundColor = SFColors.secondaryBackground
+                card.translatesAutoresizingMaskIntoConstraints = false
+                card.heightAnchor.constraint(equalTo: card.widthAnchor, multiplier: 1.2).isActive = true
+                let shimmer = SFShimmerView()
+                shimmer.translatesAutoresizingMaskIntoConstraints = false
+                card.addSubview(shimmer)
+                NSLayoutConstraint.activate([
+                    shimmer.topAnchor.constraint(equalTo: card.topAnchor),
+                    shimmer.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+                    shimmer.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+                    shimmer.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+                ])
+                row.addArrangedSubview(card)
+            }
+            grid.addArrangedSubview(row)
+        }
+
+        scrollView.addSubview(grid)
+        addSubview(scrollView)
+        addSubview(phaseBadge)
+        addSubview(messageLabel)
+
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: phaseBadge.topAnchor, constant: -SFSpacing.lg),
+
+            grid.topAnchor.constraint(equalTo: scrollView.topAnchor, constant: SFSpacing.sm),
+            grid.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: SFSpacing.md),
+            grid.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -SFSpacing.md),
+            grid.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -SFSpacing.sm),
+            grid.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -SFSpacing.md * 2),
+
+            phaseBadge.bottomAnchor.constraint(equalTo: messageLabel.topAnchor, constant: -SFSpacing.sm),
+            phaseBadge.centerXAnchor.constraint(equalTo: centerXAnchor),
+            phaseBadge.heightAnchor.constraint(equalToConstant: 28),
+            phaseBadge.widthAnchor.constraint(greaterThanOrEqualToConstant: 120),
+
+            messageLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -SFSpacing.xl),
+            messageLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SFSpacing.xl),
+            messageLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SFSpacing.xl),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func setMessage(_ text: String, phase: String = "generating") {
+        messageLabel.text = text
+        switch phase {
+        case "training":
+            phaseBadge.text = "  🧠 Training AI  "
+            phaseBadge.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.15)
+            phaseBadge.textColor = .systemOrange
+            phaseBadge.isHidden = false
+        case "generating":
+            phaseBadge.text = "  ✨ Generating  "
+            phaseBadge.backgroundColor = UIColor.systemPurple.withAlphaComponent(0.15)
+            phaseBadge.textColor = .systemPurple
+            phaseBadge.isHidden = false
+        default:
+            phaseBadge.isHidden = true
+        }
+    }
+
+    func setFinished() {
+        grid.isHidden = true
+        phaseBadge.isHidden = true
     }
 }
 
