@@ -13,7 +13,48 @@ services:
         value: com.mike.SellFace
       - key: APNS_USE_SANDBOX
         value: true
+      - key: APP_BASE_URL
+        value: https://sellface-api.onrender.com
       # Set these in the Render dashboard (imported from .env):
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_SYNC
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ADMIN_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: ASTRIA_API_KEY
+        sync: false
+      - key: APNS_KEY_ID
+        sync: false
+      - key: APNS_TEAM_ID
+        sync: false
+      - key: APNS_PRIVATE_KEY
+        sync: false
+
+  - type: worker
+    name: sellface-worker
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python worker.py
+    envVars:
+      - key: DEBUG
+        value: true
+      - key: APNS_BUNDLE_ID
+        value: com.mike.SellFace
+      - key: APNS_USE_SANDBOX
+        value: true
+      - key: APP_BASE_URL
+        value: https://sellface-api.onrender.com
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_URL_SYNC
