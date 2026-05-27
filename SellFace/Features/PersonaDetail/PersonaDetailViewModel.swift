@@ -41,16 +41,31 @@ final class PersonaDetailViewModel {
 
         let products = StoreKitManager.shared.products
         if products.isEmpty {
-            // Products still loading — wait for them, then build
             styleBundles = []
             onBundlesUpdated?()
             Task {
                 await StoreKitManager.shared.loadProducts()
                 buildBundlesFromStoreKit()
+                await fetchBundlePreviews()
             }
         } else {
             buildBundlesFromStoreKit()
+            Task { await fetchBundlePreviews() }
         }
+    }
+
+    private func fetchBundlePreviews() async {
+        var updated = false
+        for i in styleBundles.indices {
+            let bundle = styleBundles[i]
+            guard let results = try? await APIClient.shared.request(
+                endpoint: .getPersonaResults(personaId: persona.id, styleBundleId: bundle.productId),
+                responseType: [GeneratedImageResponse].self
+            ), let first = results.first else { continue }
+            styleBundles[i].previewImageUrl = first.imageUrl
+            updated = true
+        }
+        if updated { onBundlesUpdated?() }
     }
 
     private func buildBundlesFromStoreKit() {

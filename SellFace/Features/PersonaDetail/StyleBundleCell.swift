@@ -13,6 +13,17 @@ final class StyleBundleCell: UICollectionViewCell {
         return iv
     }()
 
+    private let generatedImageView: UIImageView = {
+        let iv = UIImageView()
+        iv.contentMode = .scaleAspectFill
+        iv.clipsToBounds = true
+        iv.isHidden = true
+        iv.translatesAutoresizingMaskIntoConstraints = false
+        return iv
+    }()
+
+    private var imageLoadTask: Task<Void, Never>?
+
     private let creatingBadge: UILabel = {
         let l = UILabel()
         l.text = "  Creating…  "
@@ -104,6 +115,16 @@ final class StyleBundleCell: UICollectionViewCell {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageLoadTask?.cancel()
+        imageLoadTask = nil
+        generatedImageView.image = nil
+        generatedImageView.isHidden = true
+        iconImageView.isHidden = false
+        priceLabel.isHidden = false
+    }
+
     private func setupUI() {
         card.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(card)
@@ -111,6 +132,7 @@ final class StyleBundleCell: UICollectionViewCell {
         contentView.addSubview(oldPriceLabel)
         contentView.addSubview(priceLabel)
         contentView.addSubview(taglineLabel)
+        card.addSubview(generatedImageView)
         card.addSubview(iconImageView)
         card.addSubview(shimmerView)
         card.addSubview(creatingBadge)
@@ -126,6 +148,12 @@ final class StyleBundleCell: UICollectionViewCell {
             card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             card.heightAnchor.constraint(equalTo: card.widthAnchor),
+
+            // Generated image fills the entire card
+            generatedImageView.topAnchor.constraint(equalTo: card.topAnchor),
+            generatedImageView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            generatedImageView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            generatedImageView.bottomAnchor.constraint(equalTo: card.bottomAnchor),
 
             // Icon centered in card
             iconImageView.centerXAnchor.constraint(equalTo: card.centerXAnchor),
@@ -188,8 +216,25 @@ final class StyleBundleCell: UICollectionViewCell {
             timeEstimateLabel.isHidden = true
         }
 
+        // Generated image preview — replaces icon and hides pricing
+        if let previewUrl = bundle.previewImageUrl {
+            iconImageView.isHidden = true
+            generatedImageView.isHidden = false
+            card.layer.borderWidth = 0
+            oldPriceLabel.isHidden = true
+            priceLabel.isHidden = true
+            taglineLabel.isHidden = true
+            priceLabelTopToOldPrice.isActive = false
+            priceLabelTopToCard.isActive = true
+            loadPreviewImage(url: previewUrl)
+            return
+        }
+
+        iconImageView.isHidden = false
+        generatedImageView.isHidden = true
+        priceLabel.isHidden = false
+
         if isFirstPurchase {
-            // Visible rounded gray border — user hasn't generated anything yet on this persona
             card.layer.borderColor = UIColor(white: 0.28, alpha: 1).cgColor
             card.layer.borderWidth = 1.0
 
@@ -204,14 +249,12 @@ final class StyleBundleCell: UICollectionViewCell {
             priceLabel.textColor = SFColors.accent
 
         } else {
-            // Subtle gold border — persona has prior generations
             card.layer.borderColor = SFColors.cardBorder.cgColor
             card.layer.borderWidth = 0.5
 
             taglineLabel.isHidden = true
 
             if let old = bundle.oldPrice {
-                // Stacked: strikethrough above, live price below
                 priceLabelTopToCard.isActive     = false
                 priceLabelTopToOldPrice.isActive = true
                 oldPriceLabel.isHidden = false
@@ -231,6 +274,16 @@ final class StyleBundleCell: UICollectionViewCell {
                 priceLabel.text        = bundle.price
                 priceLabel.textColor   = SFColors.accent
             }
+        }
+    }
+
+    private func loadPreviewImage(url urlString: String) {
+        imageLoadTask?.cancel()
+        guard let url = URL(string: urlString) else { return }
+        imageLoadTask = Task { [weak self] in
+            guard let (data, _) = try? await URLSession.shared.data(from: url),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run { self?.generatedImageView.image = image }
         }
     }
 
