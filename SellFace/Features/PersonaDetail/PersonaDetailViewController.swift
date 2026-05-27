@@ -4,6 +4,7 @@ final class PersonaDetailViewController: UIViewController {
 
     private let viewModel: PersonaDetailViewModel
     private var selectedCellFrame: CGRect = .zero
+    private var isFirstAppearance = true
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -41,7 +42,11 @@ final class PersonaDetailViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.delegate = self
-        viewModel.loadBundles()
+        if isFirstAppearance {
+            isFirstAppearance = false
+        } else {
+            viewModel.loadBundles()
+        }
     }
 
 
