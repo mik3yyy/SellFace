@@ -3,6 +3,8 @@ import UIKit
 final class PersonaDetailViewController: UIViewController {
 
     private let viewModel: PersonaDetailViewModel
+    private var selectedCellFrame: CGRect = .zero
+    private var hasAnimatedEntrance = false
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -34,10 +36,12 @@ final class PersonaDetailViewController: UIViewController {
         bindViewModel()
         viewModel.loadBundles()
         navigationItem.backButtonDisplayMode = .minimal
+        navigationController?.delegate = self
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        navigationController?.delegate = self
         viewModel.loadBundles()
     }
 
@@ -46,6 +50,10 @@ final class PersonaDetailViewController: UIViewController {
         navigationController?.navigationBar.alpha = 0
         UIView.animate(withDuration: 0.30, delay: 0.10) {
             self.navigationController?.navigationBar.alpha = 1
+        }
+        if !hasAnimatedEntrance && !viewModel.styleBundles.isEmpty {
+            hasAnimatedEntrance = true
+            collectionView.animateCellsEntrance()
         }
     }
 
@@ -68,6 +76,10 @@ final class PersonaDetailViewController: UIViewController {
             guard let self else { return }
             collectionView.collectionViewLayout.invalidateLayout()
             collectionView.reloadData()
+            if !hasAnimatedEntrance && !viewModel.styleBundles.isEmpty && view.window != nil {
+                hasAnimatedEntrance = true
+                DispatchQueue.main.async { self.collectionView.animateCellsEntrance() }
+            }
         }
         viewModel.onError = { [weak self] message in
             let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
@@ -112,6 +124,9 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
 extension PersonaDetailViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if let cell = collectionView.cellForItem(at: indexPath) as? StyleBundleCell {
+            selectedCellFrame = cell.card.convert(cell.card.bounds, to: view.window)
+        }
         viewModel.didTapBundle(viewModel.styleBundles[indexPath.item])
     }
 }
@@ -222,5 +237,24 @@ final class PersonaDetailHeaderView: UICollectionReusableView {
     func configure(hasGeneratedAnyBundle: Bool) {
         firstPurchaseView.isHidden = hasGeneratedAnyBundle
         availableLabel.isHidden    = !hasGeneratedAnyBundle
+    }
+}
+
+// MARK: - Card Open Transition (bundle → results)
+
+extension PersonaDetailViewController: UINavigationControllerDelegate {
+    func navigationController(
+        _ navigationController: UINavigationController,
+        animationControllerFor operation: UINavigationController.Operation,
+        from fromVC: UIViewController,
+        to toVC: UIViewController
+    ) -> UIViewControllerAnimatedTransitioning? {
+        if operation == .push,
+           fromVC === self,
+           toVC is ResultsViewController,
+           selectedCellFrame != .zero {
+            return CardPushAnimator(sourceFrame: selectedCellFrame)
+        }
+        return nil
     }
 }

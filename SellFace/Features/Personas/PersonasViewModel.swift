@@ -6,6 +6,7 @@ final class PersonasViewModel {
     weak var coordinator: AppCoordinator?
 
     private(set) var personas: [Persona] = []
+    private(set) var isLoading = false
     var onPersonasUpdated: (() -> Void)?
 
     init(coordinator: AppCoordinator) {
@@ -13,12 +14,10 @@ final class PersonasViewModel {
     }
 
     func loadPersonas() {
-        // Show cached personas immediately
+        isLoading = true
         personas = LocalStorageManager.shared.loadPersonas()
             .sorted { $0.createdAt > $1.createdAt }
         onPersonasUpdated?()
-
-        // Then refresh from backend
         Task { await fetchFromBackend() }
     }
 
@@ -29,7 +28,6 @@ final class PersonasViewModel {
                 responseType: [PersonaResponse].self
             )
             let fresh = responses.map { $0.toPersona() }.sorted { $0.createdAt > $1.createdAt }
-            // Preserve local cover image paths from cache
             let cached = LocalStorageManager.shared.loadPersonas()
             personas = fresh.map { p in
                 var updated = p
@@ -39,10 +37,9 @@ final class PersonasViewModel {
                 return updated
             }
             LocalStorageManager.shared.savePersonas(personas)
-            onPersonasUpdated?()
-        } catch {
-            // Keep showing cached data on network error
-        }
+        } catch {}
+        isLoading = false
+        onPersonasUpdated?()
     }
 
     func deletePersona(at index: Int) {

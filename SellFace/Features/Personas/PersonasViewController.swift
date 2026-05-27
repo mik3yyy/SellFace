@@ -4,8 +4,6 @@ final class PersonasViewController: UIViewController {
 
     private let viewModel: PersonasViewModel
 
-    // Tracks the tapped cell frame for the card-open transition
-    private var selectedCellFrame: CGRect = .zero
     private var hasAnimatedEntrance = false
 
     private lazy var collectionView: UICollectionView = {
@@ -21,6 +19,7 @@ final class PersonasViewController: UIViewController {
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.backgroundColor = .clear
         cv.register(PersonaCell.self, forCellWithReuseIdentifier: PersonaCell.reuseID)
+        cv.register(PersonaShimmerCell.self, forCellWithReuseIdentifier: PersonaShimmerCell.reuseID)
         cv.delegate = self
         cv.dataSource = self
         cv.translatesAutoresizingMaskIntoConstraints = false
@@ -50,7 +49,6 @@ final class PersonasViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         bindViewModel()
-        navigationController?.delegate = self
         navigationItem.backButtonDisplayMode = .minimal
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "questionmark.circle"),
@@ -126,17 +124,13 @@ final class PersonasViewController: UIViewController {
     }
 
     private func reload() {
-        let isEmpty = viewModel.personas.isEmpty
-        emptyStateView.isHidden = !isEmpty
-        collectionView.isHidden = isEmpty
+        let showEmpty = viewModel.personas.isEmpty && !viewModel.isLoading
+        emptyStateView.isHidden = !showEmpty
+        collectionView.isHidden = showEmpty
 
-        UIView.transition(with: collectionView,
-                          duration: 0.25,
-                          options: [.transitionCrossDissolve, .allowUserInteraction]) {
-            self.collectionView.reloadData()
-        }
+        collectionView.reloadData()
 
-        if !isEmpty && !hasAnimatedEntrance {
+        if !viewModel.personas.isEmpty && !hasAnimatedEntrance {
             hasAnimatedEntrance = true
             DispatchQueue.main.async { self.collectionView.animateCellsEntrance() }
         }
@@ -155,10 +149,13 @@ final class PersonasViewController: UIViewController {
 
 extension PersonasViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        viewModel.personas.count
+        viewModel.isLoading && viewModel.personas.isEmpty ? 4 : viewModel.personas.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if viewModel.isLoading && viewModel.personas.isEmpty {
+            return collectionView.dequeueReusableCell(withReuseIdentifier: PersonaShimmerCell.reuseID, for: indexPath)
+        }
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: PersonaCell.reuseID, for: indexPath) as! PersonaCell
         cell.configure(with: viewModel.personas[indexPath.item])
         return cell
@@ -167,10 +164,8 @@ extension PersonasViewController: UICollectionViewDataSource {
 
 extension PersonasViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // Capture cell frame in window coordinates for the transition animator
-        if let cell = collectionView.cellForItem(at: indexPath) as? PersonaCell {
-            selectedCellFrame = cell.card.convert(cell.card.bounds, to: view.window)
-        }
+        guard !viewModel.isLoading || !viewModel.personas.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         viewModel.didTapPersona(viewModel.personas[indexPath.item])
     }
 }
@@ -182,26 +177,6 @@ extension PersonasViewController: UICollectionViewDelegateFlowLayout {
         let width   = (collectionView.bounds.width - inset * 2 - spacing) / 2
         // Square card + room for the name label below
         return CGSize(width: width, height: width + SFSpacing.sm + 22)
-    }
-}
-
-// MARK: - Card Open Navigation Transition
-
-extension PersonasViewController: UINavigationControllerDelegate {
-    func navigationController(
-        _ navigationController: UINavigationController,
-        animationControllerFor operation: UINavigationController.Operation,
-        from fromVC: UIViewController,
-        to toVC: UIViewController
-    ) -> UIViewControllerAnimatedTransitioning? {
-        switch operation {
-        case .push where fromVC === self && toVC is PersonaDetailViewController && selectedCellFrame != .zero:
-            return CardPushAnimator(sourceFrame: selectedCellFrame)
-        case .pop where toVC === self && fromVC is PersonaDetailViewController && selectedCellFrame != .zero:
-            return CardPopAnimator(destinationFrame: selectedCellFrame)
-        default:
-            return nil
-        }
     }
 }
 
@@ -255,6 +230,49 @@ private final class PersonasEmptyStateView: UIView {
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - Shimmer Skeleton Cell
+
+final class PersonaShimmerCell: UICollectionViewCell {
+    static let reuseID = "PersonaShimmerCell"
+
+    private let cardShimmer: SFShimmerView = {
+        let v = SFShimmerView()
+        v.backgroundColor = UIColor(white: 1, alpha: 0.06)
+        v.layer.cornerRadius = SFSpacing.cardRadius
+        v.layer.cornerCurve = .continuous
+        v.clipsToBounds = true
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let nameLine: SFShimmerView = {
+        let v = SFShimmerView()
+        v.backgroundColor = UIColor(white: 1, alpha: 0.06)
+        v.layer.cornerRadius = 4
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        contentView.addSubview(cardShimmer)
+        contentView.addSubview(nameLine)
+        NSLayoutConstraint.activate([
+            cardShimmer.topAnchor.constraint(equalTo: contentView.topAnchor),
+            cardShimmer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            cardShimmer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            cardShimmer.heightAnchor.constraint(equalTo: cardShimmer.widthAnchor),
+
+            nameLine.topAnchor.constraint(equalTo: cardShimmer.bottomAnchor, constant: SFSpacing.sm),
+            nameLine.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
+            nameLine.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.55),
+            nameLine.heightAnchor.constraint(equalToConstant: 14),
         ])
     }
 
