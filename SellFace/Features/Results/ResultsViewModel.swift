@@ -30,6 +30,17 @@ final class ResultsViewModel {
     }
 
     func loadImages() {
+        // Serve from disk cache immediately — no network needed on re-open
+        if let cached = BundleImageCache.shared.getResults(personaId: persona.id, productId: bundle.productId) {
+            images = cached
+            isLoading = false
+            phase = "completed"
+            statusMessage = ""
+            onStateChanged?()
+            onImagesLoaded?()
+            return
+        }
+
         isLoading = true
         onStateChanged?()
         Task {
@@ -155,6 +166,9 @@ final class ResultsViewModel {
         isLoading = loaded.isEmpty
         phase = "completed"
         statusMessage = loaded.isEmpty ? "No images available yet." : ""
+        if !loaded.isEmpty {
+            BundleImageCache.shared.storeResults(personaId: persona.id, productId: bundle.productId, images: loaded)
+        }
         onStateChanged?()
         onImagesLoaded?()
     }

@@ -44,4 +44,43 @@ final class BundleImageCache {
             }
         }
     }
+
+    // MARK: - Full results set (multiple images per bundle)
+
+    private var resultsMemory: [String: [UIImage]] = [:]
+
+    func getResults(personaId: String, productId: String) -> [UIImage]? {
+        let key = "\(personaId)__\(productId)"
+        if let hit = resultsMemory[key] { return hit }
+
+        let countFile = dir.appendingPathComponent("results_\(key).count")
+        guard let countStr = try? String(contentsOf: countFile, encoding: .utf8),
+              let count = Int(countStr), count > 0 else { return nil }
+
+        var images: [UIImage] = []
+        for i in 0..<count {
+            let imageFile = dir.appendingPathComponent("results_\(key)_\(i).jpg")
+            guard let data = try? Data(contentsOf: imageFile),
+                  let image = UIImage(data: data) else { return nil }
+            images.append(image)
+        }
+        resultsMemory[key] = images
+        return images
+    }
+
+    func storeResults(personaId: String, productId: String, images: [UIImage]) {
+        let key = "\(personaId)__\(productId)"
+        resultsMemory[key] = images
+        let dir = self.dir
+        Task.detached(priority: .background) {
+            let countFile = dir.appendingPathComponent("results_\(key).count")
+            try? "\(images.count)".write(to: countFile, atomically: true, encoding: .utf8)
+            for (i, image) in images.enumerated() {
+                let imageFile = dir.appendingPathComponent("results_\(key)_\(i).jpg")
+                if let data = image.jpegData(compressionQuality: 0.85) {
+                    try? data.write(to: imageFile, options: .atomic)
+                }
+            }
+        }
+    }
 }
