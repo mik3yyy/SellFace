@@ -68,19 +68,7 @@
   .nav-item.active { color: var(--gold); background: var(--gold-bg); border-left-color: var(--gold); }
   .nav-icon { font-size: 16px; width: 20px; text-align: center; }
   .nav-spacer { flex: 1; }
-  .secret-input-wrap { padding: 12px 16px; border-top: 1px solid var(--border); }
-  .secret-input {
-    width: 100%;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--label);
-    padding: 7px 10px;
-    font-size: 12px;
-    outline: none;
-  }
-  .secret-input::placeholder { color: var(--sublabel); }
-  .secret-input:focus { border-color: var(--gold); }
+  .secret-input-wrap { display: none; }
 
   /* ── Main ── */
   .main {
@@ -430,7 +418,7 @@
   </nav>
   <div class="nav-spacer"></div>
   <div class="secret-input-wrap">
-    <input class="secret-input" type="password" id="secretInput" placeholder="Admin secret…" oninput="loadCurrentPage()" />
+    <input class="secret-input" type="password" id="secretInput" />
   </div>
 </aside>
 
@@ -575,16 +563,9 @@
 const BASE = '';
 let _users = [], _personas = [], _jobs = [];
 
-function secret() { return document.getElementById('secretInput').value.trim(); }
-
-function headers() { return { 'X-Admin-Secret': secret() }; }
-
 async function api(path) {
-  const r = await fetch(BASE + path, { headers: headers() });
-  if (!r.ok) {
-    if (r.status === 401) return null;
-    throw new Error(await r.text());
-  }
+  const r = await fetch(BASE + path);
+  if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
@@ -827,7 +808,7 @@ async function saveStyle() {
   try {
     const r = await fetch(`/admin/styles/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret() },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!r.ok) throw new Error(await r.text());

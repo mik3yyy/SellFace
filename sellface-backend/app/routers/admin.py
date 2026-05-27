@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 from typing import Optional
@@ -6,7 +6,6 @@ from pydantic import BaseModel
 import logging
 
 from app.database import AsyncSessionLocal
-from app.config import get_settings
 from app.models.user import User
 from app.models.persona import Persona, PersonaStatus
 from app.models.generation_job import GenerationJob, GenerationStatus
@@ -23,14 +22,8 @@ async def get_db():
         yield session
 
 
-def require_admin(x_admin_secret: Optional[str] = Header(None)):
-    settings = get_settings()
-    if not settings.admin_secret or x_admin_secret != settings.admin_secret:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
 @router.get("/overview")
-async def overview(db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+async def overview(db: AsyncSession = Depends(get_db)):
     total_users = (await db.execute(select(func.count(User.id)))).scalar_one()
     total_personas = (await db.execute(select(func.count(Persona.id)))).scalar_one()
     total_jobs = (await db.execute(select(func.count(GenerationJob.id)))).scalar_one()
@@ -63,7 +56,6 @@ async def list_users(
     page: int = 1,
     per_page: int = 50,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
 ):
     offset = (page - 1) * per_page
     result = await db.execute(
@@ -95,7 +87,6 @@ async def list_personas(
     per_page: int = 50,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
 ):
     offset = (page - 1) * per_page
     q = select(Persona).order_by(Persona.created_at.desc())
@@ -142,7 +133,6 @@ async def list_jobs(
     per_page: int = 50,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
 ):
     offset = (page - 1) * per_page
     q = select(GenerationJob).order_by(GenerationJob.created_at.desc())
@@ -187,7 +177,7 @@ async def list_jobs(
 
 
 @router.get("/styles")
-async def list_styles(db: AsyncSession = Depends(get_db), _=Depends(require_admin)):
+async def list_styles(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(StyleBundle).order_by(StyleBundle.sort_order))
     bundles = result.scalars().all()
     return [_bundle_dict(b) for b in bundles]
@@ -208,7 +198,6 @@ async def update_style(
     bundle_id: str,
     body: StyleBundleUpdate,
     db: AsyncSession = Depends(get_db),
-    _=Depends(require_admin),
 ):
     bundle = (await db.execute(select(StyleBundle).where(StyleBundle.id == bundle_id))).scalar_one_or_none()
     if not bundle:
