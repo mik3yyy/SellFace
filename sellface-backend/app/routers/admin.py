@@ -193,6 +193,18 @@ class StyleBundleUpdate(BaseModel):
     sort_order: Optional[int] = None
 
 
+@router.patch("/styles/by-product/{product_id}")
+async def update_style_by_product(
+    product_id: str,
+    body: StyleBundleUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    bundle = (await db.execute(select(StyleBundle).where(StyleBundle.product_id == product_id))).scalar_one_or_none()
+    if not bundle:
+        raise HTTPException(status_code=404, detail="Style bundle not found")
+    return await _apply_update(bundle, body, db)
+
+
 @router.patch("/styles/{bundle_id}")
 async def update_style(
     bundle_id: str,
@@ -203,6 +215,10 @@ async def update_style(
     if not bundle:
         raise HTTPException(status_code=404, detail="Style bundle not found")
 
+    return await _apply_update(bundle, body, db)
+
+
+async def _apply_update(bundle: StyleBundle, body: StyleBundleUpdate, db: AsyncSession):
     if body.name is not None:
         bundle.name = body.name
     if body.description is not None:

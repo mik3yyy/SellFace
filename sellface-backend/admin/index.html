@@ -24,7 +24,7 @@
       width: 100%;
       max-width: 480px;
     }
-    h1 { color: #c9a84c; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    h1  { color: #c9a84c; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
     .sub { color: #555; font-size: 13px; margin-bottom: 28px; }
 
     label {
@@ -46,9 +46,15 @@
       font-size: 14px;
       margin-bottom: 20px;
       transition: border-color 0.15s;
-      appearance: none;
     }
-    select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+    select {
+      appearance: none;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
     select:focus, input[type="url"]:focus { outline: none; border-color: #c9a84c; }
     select option { background: #161616; }
 
@@ -80,20 +86,19 @@
       cursor: pointer;
       transition: background 0.15s;
     }
-    button:hover { background: #dabb63; }
-    button:disabled { opacity: 0.5; cursor: default; }
+    button:hover  { background: #dabb63; }
+    button:active { background: #b8963e; }
+    button:disabled { opacity: 0.45; cursor: default; }
 
     .status {
       text-align: center;
       font-size: 13px;
       margin-top: 14px;
-      height: 18px;
+      min-height: 18px;
     }
-    .status.ok  { color: #4caf50; }
-    .status.err { color: #ef5350; }
+    .status.ok   { color: #4caf50; }
+    .status.err  { color: #ef5350; }
     .status.busy { color: #c9a84c; }
-
-    .loading { text-align: center; color: #c9a84c; padding: 12px 0; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -102,9 +107,16 @@
   <p class="sub">Set a preview image for each bundle</p>
 
   <label>Bundle</label>
-  <div id="dropdownArea">
-    <div class="loading">Loading bundles…</div>
-  </div>
+  <select id="bundleSelect">
+    <option value="com.sellface.style.professional">Professional</option>
+    <option value="com.sellface.style.linkedin">LinkedIn</option>
+    <option value="com.sellface.style.executive">Executive</option>
+    <option value="com.sellface.style.casual">Casual</option>
+    <option value="com.sellface.style.creator">Creator</option>
+    <option value="com.sellface.style.sales">Sales</option>
+    <option value="com.sellface.style.oldmoney">Old Money</option>
+    <option value="com.sellface.style.studio">Studio</option>
+  </select>
 
   <label>Image URL</label>
   <input type="url" id="imageUrl" placeholder="Paste image URL here…" oninput="updatePreview()" />
@@ -112,82 +124,45 @@
   <label>Preview</label>
   <div class="thumb-wrap" id="thumbWrap">No image</div>
 
-  <button id="saveBtn" onclick="save()" disabled>Save</button>
+  <button id="saveBtn" onclick="save()">Save</button>
   <div class="status" id="status"></div>
 </div>
 
 <script>
   const API = 'https://sellface-api.onrender.com';
-  let bundles = [];
-
-  async function init() {
-    try {
-      const res = await fetch(`${API}/admin/styles`);
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-      bundles = await res.json();
-      renderDropdown();
-    } catch (e) {
-      document.getElementById('dropdownArea').innerHTML =
-        `<div style="color:#ef5350;font-size:13px;margin-bottom:20px">Failed to load: ${e.message}</div>`;
-    }
-  }
-
-  function renderDropdown() {
-    const options = bundles.map(b =>
-      `<option value="${b.id}" data-url="${esc(b.preview_image_url || '')}">${b.name}</option>`
-    ).join('');
-    document.getElementById('dropdownArea').innerHTML =
-      `<select id="bundleSelect" onchange="onBundleChange()">${options}</select>`;
-    document.getElementById('saveBtn').disabled = false;
-    onBundleChange();
-  }
-
-  function onBundleChange() {
-    const sel = document.getElementById('bundleSelect');
-    const opt = sel.options[sel.selectedIndex];
-    const existing = opt.dataset.url || '';
-    document.getElementById('imageUrl').value = existing;
-    updatePreview();
-  }
 
   function updatePreview() {
-    const url = document.getElementById('imageUrl').value.trim();
+    const url  = document.getElementById('imageUrl').value.trim();
     const wrap = document.getElementById('thumbWrap');
     if (!url) { wrap.textContent = 'No image'; return; }
     wrap.innerHTML = `<img src="${esc(url)}" onerror="this.parentElement.textContent='Could not load image'" />`;
   }
 
   async function save() {
-    const sel = document.getElementById('bundleSelect');
-    if (!sel) return;
-    const id  = sel.value;
-    const url = document.getElementById('imageUrl').value.trim();
-    const btn = document.getElementById('saveBtn');
-    const st  = document.getElementById('status');
+    const productId = document.getElementById('bundleSelect').value;
+    const url       = document.getElementById('imageUrl').value.trim();
+    const btn       = document.getElementById('saveBtn');
+    const st        = document.getElementById('status');
 
-    btn.disabled = true;
-    st.className = 'status busy';
-    st.textContent = 'Saving…';
+    if (!url) { st.className = 'status err'; st.textContent = 'Paste an image URL first.'; return; }
+
+    btn.disabled    = true;
+    st.className    = 'status busy';
+    st.textContent  = 'Saving…';
 
     try {
-      const res = await fetch(`${API}/admin/styles/${id}`, {
-        method: 'PATCH',
+      const res = await fetch(`${API}/admin/styles/by-product/${encodeURIComponent(productId)}`, {
+        method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preview_image_url: url || null }),
+        body:    JSON.stringify({ preview_image_url: url }),
       });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 
-      // Update local cache so switching back shows new URL
-      const b = bundles.find(b => b.id === id);
-      if (b) b.preview_image_url = url;
-      const opt = sel.options[sel.selectedIndex];
-      opt.dataset.url = url;
-
-      st.className = 'status ok';
-      st.textContent = '✓ Saved';
-      setTimeout(() => { st.textContent = ''; }, 3000);
+      st.className  = 'status ok';
+      st.textContent = '✓ Saved — image will appear in the app on next load';
+      setTimeout(() => { st.textContent = ''; }, 4000);
     } catch (e) {
-      st.className = 'status err';
+      st.className  = 'status err';
       st.textContent = `Error: ${e.message}`;
     } finally {
       btn.disabled = false;
@@ -195,10 +170,12 @@
   }
 
   function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
-
-  init();
 </script>
 </body>
 </html>
