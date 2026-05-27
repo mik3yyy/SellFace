@@ -20,7 +20,13 @@ final class ResultsViewModel {
         self.bundle = bundle
         self.jobId = jobId
         self.estimatedMinutes = estimatedMinutes
-        statusMessage = "Generating your headshots…\n~\(estimatedMinutes) min"
+        if jobId != nil {
+            phase = "generating"
+            statusMessage = "Generating your headshots…\n~\(estimatedMinutes) min"
+        } else {
+            phase = "loading"
+            statusMessage = ""
+        }
     }
 
     func loadImages() {
