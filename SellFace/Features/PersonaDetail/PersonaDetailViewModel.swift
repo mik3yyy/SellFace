@@ -8,9 +8,11 @@ final class PersonaDetailViewModel {
 
     private(set) var styleBundles: [StyleBundle] = []
     private(set) var generatingBundleId: String?
-    private var bundlePreviewImages: [String: UIImage] = [:]  // productId → downloaded image
+    private var bundlePreviewImages: [String: UIImage] = [:]  // productId → UIImage (this VM instance)
 
-    // Per-persona: true only after this persona has had at least one bundle generated
+    // Survives back-navigation and ViewModel recreation within the same app session
+    private static var sessionImageCache: [String: (url: String, image: UIImage)] = [:]
+
     var hasGeneratedAnyBundle: Bool {
         LocalStorageManager.shared.hasGeneratedBundle(forPersonaId: persona.id)
     }
@@ -22,18 +24,15 @@ final class PersonaDetailViewModel {
     init(persona: Persona, coordinator: AppCoordinator) {
         self.persona = persona
         self.coordinator = coordinator
-        // Restore shimmer if a job was in progress when app was last open
         if let (bundleId, jobId) = LocalStorageManager.shared.activeJob(forPersonaId: persona.id) {
             generatingBundleId = bundleId
             Task { await pollUntilComplete(jobId: jobId) }
         }
     }
 
-    // MARK: - Bundle loading (StoreKit only)
+    // MARK: - Bundle loading
 
     func loadBundles() {
-        // Re-sync generating state from LocalStorage — covers the case where the user
-        // backgrounds the app, relaunches, or viewWillAppear fires on an existing VM instance.
         if generatingBundleId == nil,
            let (bundleId, jobId) = LocalStorageManager.shared.activeJob(forPersonaId: persona.id) {
             generatingBundleId = bundleId
@@ -72,6 +71,11 @@ final class PersonaDetailViewModel {
                 oldPrice = nil
             }
 
+            // Check session cache — if hit, set previewImageUrl immediately (no shimmer on re-navigation)
+            let cacheKey = "\(persona.id)_\(product.id)"
+            let cached = Self.sessionImageCache[cacheKey]
+            bundlePreviewImages[product.id] = cached?.image
+
             return StyleBundle(
                 id: meta.id,
                 name: product.displayName,
@@ -82,9 +86,19 @@ final class PersonaDetailViewModel {
                 oldPrice: oldPrice,
                 previewImageName: meta.previewImageName,
                 isUnlocked: unlocked.contains(product.id),
-                isCheckingPreview: completedIds.contains(product.id)
+                previewImageUrl: cached?.url,
+                isCheckingPreview: completedIds.contains(product.id) && cached == nil
             )
         }
+
+        // Clear stale generating badge if the backend now reports this bundle as completed
+        if let gid = generatingBundleId,
+           let bundle = styleBundles.first(where: { $0.id == gid }),
+           completedIds.contains(bundle.productId) {
+            generatingBundleId = nil
+            LocalStorageManager.shared.clearActiveJob(forPersonaId: persona.id)
+        }
+
         onBundlesUpdated?()
     }
 
@@ -118,7 +132,10 @@ final class PersonaDetailViewModel {
                 let productId = styleBundles[i].productId
                 styleBundles[i].previewImageUrl = url
                 styleBundles[i].isCheckingPreview = false
-                if let image { bundlePreviewImages[productId] = image }
+                if let url, let image {
+                    bundlePreviewImages[productId] = image
+                    Self.sessionImageCache["\(persona.id)_\(productId)"] = (url: url, image: image)
+                }
                 onBundlesUpdated?()
             }
         }
@@ -127,12 +144,10 @@ final class PersonaDetailViewModel {
     // MARK: - Bundle interaction
 
     func didTapBundle(_ bundle: StyleBundle) {
-        // Always go through purchase — Apple handles free restore if already bought
         Task { await purchaseBundle(bundle) }
     }
 
     private func startGeneration(bundle: StyleBundle) async {
-        // Check for already-completed results first — avoids creating a redundant Astria job
         if let existingImages = try? await APIClient.shared.request(
             endpoint: .getPersonaResults(personaId: persona.id, styleBundleId: bundle.productId),
             responseType: [GeneratedImageResponse].self
@@ -171,27 +186,39 @@ final class PersonaDetailViewModel {
     }
 
     private func pollUntilComplete(jobId: String) async {
+        // Check immediately first — no 30s wait if the job already finished before we got here
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(30))
-            guard let job = try? await APIClient.shared.request(
+            if let job = try? await APIClient.shared.request(
                 endpoint: .getGenerationJob(id: jobId),
                 responseType: GenerationJobResponse.self
-            ) else { continue }
-            if job.status == "completed" || job.status == "failed" {
+            ), job.status == "completed" || job.status == "failed" {
                 LocalStorageManager.shared.clearActiveJob(forPersonaId: persona.id)
                 generatingBundleId = nil
                 onBundlesUpdated?()
+                if job.status == "completed" {
+                    // Re-fetch persona to get updated completedBundleProductIds, then load images
+                    await refreshPersonaAndPreviews()
+                }
                 return
             }
+            try? await Task.sleep(for: .seconds(30))
         }
+    }
+
+    private func refreshPersonaAndPreviews() async {
+        guard let response = try? await APIClient.shared.request(
+            endpoint: .getPersona(id: persona.id),
+            responseType: PersonaResponse.self
+        ) else { return }
+        persona = response.toPersona()
+        buildBundlesFromStoreKit()
+        await fetchBundlePreviews()
     }
 
     private func purchaseBundle(_ bundle: StyleBundle) async {
         do {
             let success = try await StoreKitManager.shared.purchase(productId: bundle.productId)
-            if success {
-                await startGeneration(bundle: bundle)
-            }
+            if success { await startGeneration(bundle: bundle) }
         } catch {
             onError?("Purchase failed: \(error.localizedDescription)")
         }
