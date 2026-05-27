@@ -123,6 +123,9 @@ final class StyleBundleCell: UICollectionViewCell {
         generatedImageView.isHidden = true
         iconImageView.isHidden = false
         priceLabel.isHidden = false
+        shimmerView.stopAnimating()
+        shimmerView.isHidden = true
+        timeEstimateLabel.isHidden = true
     }
 
     private func setupUI() {
@@ -199,12 +202,47 @@ final class StyleBundleCell: UICollectionViewCell {
     // MARK: - Configure
 
     func configure(with bundle: StyleBundle, isFirstPurchase: Bool, isGenerating: Bool) {
-        nameLabel.text  = bundle.name
+        nameLabel.text = bundle.name
+        creatingBadge.isHidden = true
         let sym = UIImage.SymbolConfiguration(pointSize: 26, weight: .light)
         iconImageView.image = UIImage(systemName: bundle.previewImageName, withConfiguration: sym)
 
-        // Shimmer + time estimate replaces the plain text badge
-        creatingBadge.isHidden = true
+        // ── State 1: Has generated image — show photo, no price ───────────────
+        if let previewUrl = bundle.previewImageUrl {
+            iconImageView.isHidden = true
+            generatedImageView.isHidden = false
+            shimmerView.stopAnimating(); shimmerView.isHidden = true
+            timeEstimateLabel.isHidden = true
+            card.layer.borderWidth = 0
+            oldPriceLabel.isHidden = true
+            priceLabel.isHidden = true
+            taglineLabel.isHidden = true
+            priceLabelTopToOldPrice.isActive = false
+            priceLabelTopToCard.isActive = true
+            loadPreviewImage(url: previewUrl)
+            return
+        }
+
+        // ── State 2: Checking for results — shimmer, no price ─────────────────
+        if bundle.isCheckingPreview {
+            iconImageView.isHidden = true
+            generatedImageView.isHidden = true
+            shimmerView.isHidden = false
+            shimmerView.startAnimating()
+            timeEstimateLabel.isHidden = true
+            oldPriceLabel.isHidden = true
+            priceLabel.isHidden = true
+            taglineLabel.isHidden = true
+            card.layer.borderColor = SFColors.cardBorder.cgColor
+            card.layer.borderWidth = 0.5
+            return
+        }
+
+        // ── State 3: Normal — icon + price ────────────────────────────────────
+        iconImageView.isHidden = false
+        generatedImageView.isHidden = true
+        priceLabel.isHidden = false
+
         if isGenerating {
             shimmerView.isHidden = false
             shimmerView.startAnimating()
@@ -216,54 +254,28 @@ final class StyleBundleCell: UICollectionViewCell {
             timeEstimateLabel.isHidden = true
         }
 
-        // Generated image preview — replaces icon and hides pricing
-        if let previewUrl = bundle.previewImageUrl {
-            iconImageView.isHidden = true
-            generatedImageView.isHidden = false
-            card.layer.borderWidth = 0
-            oldPriceLabel.isHidden = true
-            priceLabel.isHidden = true
-            taglineLabel.isHidden = true
-            priceLabelTopToOldPrice.isActive = false
-            priceLabelTopToCard.isActive = true
-            loadPreviewImage(url: previewUrl)
-            return
-        }
-
-        iconImageView.isHidden = false
-        generatedImageView.isHidden = true
-        priceLabel.isHidden = false
-
         if isFirstPurchase {
             card.layer.borderColor = UIColor(white: 0.28, alpha: 1).cgColor
             card.layer.borderWidth = 1.0
-
             priceLabelTopToOldPrice.isActive = false
             priceLabelTopToCard.isActive     = true
             oldPriceLabel.isHidden = true
-
             taglineLabel.isHidden = false
             taglineLabel.text     = bundle.tagline
-
-            priceLabel.text      = bundle.price
-            priceLabel.textColor = SFColors.accent
-
+            priceLabel.text       = bundle.price
+            priceLabel.textColor  = SFColors.accent
         } else {
             card.layer.borderColor = SFColors.cardBorder.cgColor
             card.layer.borderWidth = 0.5
-
             taglineLabel.isHidden = true
-
             if let old = bundle.oldPrice {
                 priceLabelTopToCard.isActive     = false
                 priceLabelTopToOldPrice.isActive = true
                 oldPriceLabel.isHidden = false
                 oldPriceLabel.attributedText = NSAttributedString(
                     string: old,
-                    attributes: [
-                        .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                        .foregroundColor: SFColors.strikethroughPrice,
-                    ]
+                    attributes: [.strikethroughStyle: NSUnderlineStyle.single.rawValue,
+                                 .foregroundColor: SFColors.strikethroughPrice]
                 )
                 priceLabel.text      = bundle.price
                 priceLabel.textColor = SFColors.accent

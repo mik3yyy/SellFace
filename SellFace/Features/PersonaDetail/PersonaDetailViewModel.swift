@@ -55,30 +55,35 @@ final class PersonaDetailViewModel {
     }
 
     private func fetchBundlePreviews() async {
-        var updated = false
-        for i in styleBundles.indices {
-            let bundle = styleBundles[i]
-            guard let results = try? await APIClient.shared.request(
-                endpoint: .getPersonaResults(personaId: persona.id, styleBundleId: bundle.productId),
-                responseType: [GeneratedImageResponse].self
-            ), let first = results.first else { continue }
-            styleBundles[i].previewImageUrl = first.imageUrl
-            updated = true
+        guard hasGeneratedAnyBundle else { return }
+        await withTaskGroup(of: (Int, String?).self) { group in
+            for i in styleBundles.indices {
+                let productId = styleBundles[i].productId
+                let personaId = persona.id
+                group.addTask {
+                    let results = try? await APIClient.shared.request(
+                        endpoint: .getPersonaResults(personaId: personaId, styleBundleId: productId),
+                        responseType: [GeneratedImageResponse].self
+                    )
+                    return (i, results?.first?.imageUrl)
+                }
+            }
+            for await (i, url) in group {
+                styleBundles[i].previewImageUrl = url
+                styleBundles[i].isCheckingPreview = false
+                onBundlesUpdated?()
+            }
         }
-        if updated { onBundlesUpdated?() }
     }
 
     private func buildBundlesFromStoreKit() {
-        let products = StoreKitManager.shared.products   // sorted cheapest → most expensive
+        let products = StoreKitManager.shared.products
         let unlocked = StoreKitManager.shared.purchasedProductIDs
+        let checkPreviews = hasGeneratedAnyBundle
 
         styleBundles = products.compactMap { product -> StyleBundle? in
-            // Static metadata: maps productId → backend id, icon, regular price
-            guard let meta = StyleBundle.staticMetadata.first(where: { $0.productId == product.id }) else {
-                return nil  // unknown product — skip
-            }
+            guard let meta = StyleBundle.staticMetadata.first(where: { $0.productId == product.id }) else { return nil }
 
-            // Show strikethrough only when Apple is charging less than the regular price
             let oldPrice: String?
             if let regularStr = meta.regularPrice,
                let regularVal = Decimal(string: regularStr.filter { $0.isNumber || $0 == "." }),
@@ -97,7 +102,8 @@ final class PersonaDetailViewModel {
                 price: product.displayPrice,
                 oldPrice: oldPrice,
                 previewImageName: meta.previewImageName,
-                isUnlocked: unlocked.contains(product.id)
+                isUnlocked: unlocked.contains(product.id),
+                isCheckingPreview: checkPreviews  // show shimmer immediately for returning users
             )
         }
         onBundlesUpdated?()

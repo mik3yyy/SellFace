@@ -10,7 +10,8 @@ struct StyleBundle: Identifiable, Codable {
     var oldPrice: String?        // only set when Apple price < regularPrice
     var previewImageName: String
     var isUnlocked: Bool
-    var previewImageUrl: String? // first generated image URL, set after results load
+    var previewImageUrl: String?    // first generated image URL, set after results load
+    var isCheckingPreview: Bool = false // shimmer while fetching preview URL
 
     // MARK: - Static metadata
     struct Metadata {
