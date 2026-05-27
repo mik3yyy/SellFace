@@ -21,10 +21,12 @@ struct PersonaResponse: Codable {
     let coverImageUrl: String?
     let imageCount: Int
     let createdAt: Date
+    let completedBundleProductIds: [String]?
 
     func toPersona() -> Persona {
         var p = Persona(id: id, name: name, status: PersonaStatus(rawValue: status) ?? .draft, createdAt: createdAt)
         p.coverImageURL = coverImageUrl
+        p.completedBundleProductIds = completedBundleProductIds ?? []
         return p
     }
 }

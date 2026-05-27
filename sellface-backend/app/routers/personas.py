@@ -59,10 +59,16 @@ async def list_personas(
         .order_by(Persona.created_at.desc())
     )
     personas = result.scalars().all()
+
+    # Fetch completed bundle product_ids for all personas in one query
+    persona_ids = [p.id for p in personas]
+    completed_map = await _completed_bundle_product_ids(db, user.id, persona_ids)
+
     out = []
     for p in personas:
         o = PersonaOut.model_validate(p)
         o.image_count = len(p.images)
+        o.completed_bundle_product_ids = completed_map.get(p.id, [])
         out.append(o)
     return out
 
@@ -82,9 +88,12 @@ async def get_persona(
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
 
+    completed_map = await _completed_bundle_product_ids(db, user.id, [persona_id])
+
     out = PersonaDetailOut.model_validate(persona)
     out.image_count = len(persona.images)
     out.images = [PersonaImageOut.model_validate(i) for i in persona.images]
+    out.completed_bundle_product_ids = completed_map.get(persona_id, [])
     return out
 
 
@@ -186,6 +195,28 @@ async def get_persona_results(
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+async def _completed_bundle_product_ids(
+    db: AsyncSession, user_id: str, persona_ids: list[str]
+) -> dict[str, list[str]]:
+    """Returns {persona_id: [product_id, ...]} for all completed bundles."""
+    if not persona_ids:
+        return {}
+    rows = await db.execute(
+        select(GenerationJob.persona_id, StyleBundle.product_id)
+        .join(StyleBundle, GenerationJob.style_bundle_id == StyleBundle.id)
+        .where(
+            GenerationJob.user_id == user_id,
+            GenerationJob.persona_id.in_(persona_ids),
+            GenerationJob.status == GenerationStatus.completed,
+        )
+        .distinct()
+    )
+    result: dict[str, list[str]] = {}
+    for persona_id, product_id in rows.all():
+        result.setdefault(persona_id, []).append(product_id)
+    return result
+
 
 async def _upload_to_cloudinary(data: bytes, persona_id: str, image_id: str) -> dict:
     folder = f"sellface/personas/{persona_id}"

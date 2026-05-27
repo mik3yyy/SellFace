@@ -34,6 +34,7 @@ class PersonaOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     image_count: int = 0
+    completed_bundle_product_ids: list[str] = []  # product_ids of bundles with completed generations
 
     model_config = {"from_attributes": True}
 

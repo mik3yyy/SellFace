@@ -54,32 +54,10 @@ final class PersonaDetailViewModel {
         }
     }
 
-    private func fetchBundlePreviews() async {
-        guard hasGeneratedAnyBundle else { return }
-        await withTaskGroup(of: (Int, String?).self) { group in
-            for i in styleBundles.indices {
-                let productId = styleBundles[i].productId
-                let personaId = persona.id
-                group.addTask {
-                    let results = try? await APIClient.shared.request(
-                        endpoint: .getPersonaResults(personaId: personaId, styleBundleId: productId),
-                        responseType: [GeneratedImageResponse].self
-                    )
-                    return (i, results?.first?.imageUrl)
-                }
-            }
-            for await (i, url) in group {
-                styleBundles[i].previewImageUrl = url
-                styleBundles[i].isCheckingPreview = false
-                onBundlesUpdated?()
-            }
-        }
-    }
-
     private func buildBundlesFromStoreKit() {
         let products = StoreKitManager.shared.products
         let unlocked = StoreKitManager.shared.purchasedProductIDs
-        let checkPreviews = hasGeneratedAnyBundle
+        let completedIds = Set(persona.completedBundleProductIds)
 
         styleBundles = products.compactMap { product -> StyleBundle? in
             guard let meta = StyleBundle.staticMetadata.first(where: { $0.productId == product.id }) else { return nil }
@@ -103,10 +81,35 @@ final class PersonaDetailViewModel {
                 oldPrice: oldPrice,
                 previewImageName: meta.previewImageName,
                 isUnlocked: unlocked.contains(product.id),
-                isCheckingPreview: checkPreviews  // show shimmer immediately for returning users
+                isCheckingPreview: completedIds.contains(product.id)
             )
         }
         onBundlesUpdated?()
+    }
+
+    private func fetchBundlePreviews() async {
+        // Only fetch images for bundles the backend told us have completed results
+        let indicesToFetch = styleBundles.indices.filter { styleBundles[$0].isCheckingPreview }
+        guard !indicesToFetch.isEmpty else { return }
+
+        await withTaskGroup(of: (Int, String?).self) { group in
+            for i in indicesToFetch {
+                let productId = styleBundles[i].productId
+                let personaId = persona.id
+                group.addTask {
+                    let results = try? await APIClient.shared.request(
+                        endpoint: .getPersonaResults(personaId: personaId, styleBundleId: productId),
+                        responseType: [GeneratedImageResponse].self
+                    )
+                    return (i, results?.first?.imageUrl)
+                }
+            }
+            for await (i, url) in group {
+                styleBundles[i].previewImageUrl = url
+                styleBundles[i].isCheckingPreview = false
+                onBundlesUpdated?()
+            }
+        }
     }
 
     // MARK: - Bundle interaction

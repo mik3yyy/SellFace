@@ -15,6 +15,7 @@ struct Persona: Identifiable, Codable {
     var localCoverImagePath: String?
     var status: PersonaStatus
     var createdAt: Date
+    var completedBundleProductIds: [String] = []
 
     init(id: String = UUID().uuidString, name: String, status: PersonaStatus = .draft, createdAt: Date = Date()) {
         self.id = id
