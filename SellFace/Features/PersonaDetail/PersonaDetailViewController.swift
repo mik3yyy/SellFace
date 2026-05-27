@@ -44,13 +44,6 @@ final class PersonaDetailViewController: UIViewController {
         viewModel.loadBundles()
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        navigationController?.navigationBar.alpha = 0
-        UIView.animate(withDuration: 0.30, delay: 0.10) {
-            self.navigationController?.navigationBar.alpha = 1
-        }
-    }
 
     private func setupUI() {
         title = viewModel.persona.name
