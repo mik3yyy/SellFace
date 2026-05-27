@@ -117,6 +117,9 @@ STYLE_PROMPTS: dict[str, tuple[str, str]] = {
 
 NEGATIVE_DEFAULT = "blurry, lowres, bad anatomy, bad hands, extra fingers, deformed, ugly, cartoon, anime, watermark, text"
 
+# Flux1.dev base model ID in Astria gallery — all Flux LoRA inference routes through this
+FLUX_BASE_TUNE_ID = 1504944
+
 
 def _headers() -> dict:
     if not settings.astria_api_key:
@@ -140,12 +143,18 @@ def create_tune(title: str, image_urls: list[str], subject_keyword: str = "man")
     if not image_urls:
         raise ValueError("At least one image URL is required to create a tune")
 
+    is_flux = settings.astria_branch == "flux1"
     data = {
         "tune[title]": title,
-        "tune[name]": subject_keyword,       # "man" | "woman" | "person"
+        "tune[name]": subject_keyword,    # "man" | "woman" | "person"
         "tune[branch]": settings.astria_branch,
-        "tune[callback]": "",                 # no webhook — we poll
     }
+    if is_flux:
+        # Flux requires model_type=lora, a base_tune_id, and a portrait preset
+        data["tune[model_type]"] = "lora"
+        data["tune[base_tune_id]"] = str(FLUX_BASE_TUNE_ID)
+        data["tune[preset]"] = "flux-lora-portrait"
+    # Do NOT pass tune[callback] — empty string is rejected as invalid URL
     # Astria expects repeated keys for arrays
     for url in image_urls:
         data.setdefault("tune[image_urls][]", [])
@@ -199,8 +208,22 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
     ))
     positive = positive.replace("{kw}", trigger)
 
-    payload = {
-        "prompt": {
+    is_flux = settings.astria_branch == "flux1"
+    if is_flux:
+        # Flux LoRA inference: reference the trained model inline and POST to base tune
+        positive = f"<lora:{tune_id}:1> {positive}"
+        endpoint_tune_id = FLUX_BASE_TUNE_ID
+        prompt_body = {
+            "text": positive,
+            "negative_prompt": negative,
+            "num_images": settings.effective_images_per_job,
+            "w": 768,
+            "h": 1024,
+            "steps": 28,
+        }
+    else:
+        endpoint_tune_id = tune_id
+        prompt_body = {
             "text": positive,
             "negative_prompt": negative,
             "num_images": settings.effective_images_per_job,
@@ -208,12 +231,13 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
             "h": 1024,
             "steps": 30,
             "cfg_scale": 7.5,
-            "callback": "",
         }
-    }
-    logger.info("Creating Astria prompt for tune %s | style=%s", tune_id, style_name)
+    # Do NOT pass callback — empty string is rejected as invalid URL
+
+    payload = {"prompt": prompt_body}
+    logger.info("Creating Astria prompt for tune %s via endpoint tune %s | style=%s", tune_id, endpoint_tune_id, style_name)
     response = requests.post(
-        _url(f"/tunes/{tune_id}/prompts"),
+        _url(f"/tunes/{endpoint_tune_id}/prompts"),
         headers=_headers(),
         json=payload,
         timeout=30,
@@ -225,9 +249,10 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
 
 
 def get_prompt(tune_id: int, prompt_id: int) -> dict:
-    """Fetch current prompt state. `images` is populated when generation is complete."""
+    """Fetch current prompt state. For Flux, prompts live under the base tune endpoint."""
+    endpoint_tune_id = FLUX_BASE_TUNE_ID if settings.astria_branch == "flux1" else tune_id
     response = requests.get(
-        _url(f"/tunes/{tune_id}/prompts/{prompt_id}"),
+        _url(f"/tunes/{endpoint_tune_id}/prompts/{prompt_id}"),
         headers=_headers(),
         timeout=15,
     )
