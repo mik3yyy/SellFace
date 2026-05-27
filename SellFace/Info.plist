@@ -30,6 +30,15 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>SellFace needs access to your photos to create your AI persona.</string>
 	<key>API_BASE_URL</key>
-	<string>$(API_BASE_URL)</string>
+	<string>https://sellface.onrender.com</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchIcon</string>
+		<key>UIImageRespectsSafeAreaInsets</key>
+		<false/>
+	</dict>
 </dict>
 </plist>

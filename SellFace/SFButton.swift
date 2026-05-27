@@ -25,7 +25,7 @@ final class SFButton: UIButton {
         cfg.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: SFSpacing.lg, bottom: 0, trailing: SFSpacing.lg)
         cfg.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var a = attrs
-            a.font = SFTypography.headline()
+            a.font = UIFont.systemFont(ofSize: 17, weight: .bold)
             a.kern = 0.3
             return a
         }

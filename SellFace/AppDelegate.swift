@@ -4,6 +4,8 @@ import UIKit
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Initialise StoreKit immediately so products are ready before any purchase screen appears.
+        _ = StoreKitManager.shared
         return true
     }
 

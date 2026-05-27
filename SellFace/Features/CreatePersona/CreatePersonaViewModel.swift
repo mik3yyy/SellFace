@@ -16,12 +16,17 @@ final class CreatePersonaViewModel {
         self.coordinator = coordinator
     }
 
+    func addImages(_ images: [UIImage]) {
+        selectedImages = Array((selectedImages + images).prefix(15))
+        onImagesUpdated?()
+    }
+
     func didSelectImages(_ images: [UIImage]) {
         selectedImages = images
         onImagesUpdated?()
     }
 
-    func createPersona(name: String) {
+    func createPersona(name: String, gender: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else {
             onError?("Please enter a name for this persona.")
@@ -35,12 +40,14 @@ final class CreatePersonaViewModel {
 
         isCreating = true
 
+        let subjectKeyword = gender.lowercased() == "male" ? "man" : "woman"
+
         Task {
             do {
                 // Step 1: Create the persona record
                 let personaResponse = try await APIClient.shared.request(
                     endpoint: .createPersona,
-                    body: CreatePersonaBody(name: trimmedName, subjectKeyword: "person"),
+                    body: CreatePersonaBody(name: trimmedName, subjectKeyword: subjectKeyword),
                     responseType: PersonaResponse.self
                 )
 

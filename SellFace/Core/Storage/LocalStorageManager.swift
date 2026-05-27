@@ -8,10 +8,12 @@ final class LocalStorageManager {
     private let defaults = UserDefaults.standard
 
     private enum Key {
-        static let personas = "sf_personas"
-        static let userIdentity = "sf_user_identity"
-        static let generationJobs = "sf_generation_jobs"
-        static let unlockedBundles = "sf_unlocked_bundles"
+        static let personas          = "sf_personas"
+        static let userIdentity      = "sf_user_identity"
+        static let generationJobs    = "sf_generation_jobs"
+        static let unlockedBundles   = "sf_unlocked_bundles"
+        static let generatedPersonas = "sf_generated_personas"
+        static let activeJobs        = "sf_active_jobs"
     }
 
     private init() {}
@@ -96,5 +98,43 @@ final class LocalStorageManager {
         var current = loadUnlockedBundles()
         current.insert(productId)
         saveUnlockedBundles(current)
+    }
+
+    // MARK: - Per-persona generation tracking
+
+    func markPersonaAsGenerated(_ personaId: String) {
+        var ids = Set(defaults.stringArray(forKey: Key.generatedPersonas) ?? [])
+        ids.insert(personaId)
+        defaults.set(Array(ids), forKey: Key.generatedPersonas)
+    }
+
+    func hasGeneratedBundle(forPersonaId personaId: String) -> Bool {
+        let ids = Set(defaults.stringArray(forKey: Key.generatedPersonas) ?? [])
+        return ids.contains(personaId)
+    }
+
+    // MARK: - Active job tracking (persists shimmer across app restarts)
+
+    func storeActiveJob(personaId: String, bundleId: String, jobId: String) {
+        var jobs = activeJobs()
+        jobs[personaId] = ["bundleId": bundleId, "jobId": jobId]
+        defaults.set(jobs, forKey: Key.activeJobs)
+    }
+
+    func activeJob(forPersonaId personaId: String) -> (bundleId: String, jobId: String)? {
+        guard let entry = activeJobs()[personaId],
+              let bundleId = entry["bundleId"],
+              let jobId    = entry["jobId"] else { return nil }
+        return (bundleId, jobId)
+    }
+
+    func clearActiveJob(forPersonaId personaId: String) {
+        var jobs = activeJobs()
+        jobs.removeValue(forKey: personaId)
+        defaults.set(jobs, forKey: Key.activeJobs)
+    }
+
+    private func activeJobs() -> [String: [String: String]] {
+        defaults.dictionary(forKey: Key.activeJobs) as? [String: [String: String]] ?? [:]
     }
 }

@@ -73,6 +73,16 @@ final class PersonasViewController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Gradient mask: blur fades from fully transparent at top → fully opaque at bottom
+        let gradient = CAGradientLayer()
+        gradient.frame = buttonBackdrop.bounds
+        gradient.colors = [UIColor.clear.cgColor, UIColor.black.cgColor]
+        gradient.locations = [0.0, 0.5]
+        buttonBackdrop.layer.mask = gradient
+    }
+
     private func setupUI() {
         title = "SellFace"
         view.backgroundColor = SFColors.background
@@ -98,7 +108,7 @@ final class PersonasViewController: UIViewController {
             buttonBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             buttonBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             buttonBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            buttonBackdrop.topAnchor.constraint(equalTo: createButton.topAnchor, constant: -SFSpacing.md),
+            buttonBackdrop.topAnchor.constraint(equalTo: createButton.topAnchor, constant: -90),
 
             createButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: SFSpacing.md),
             createButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -SFSpacing.md),
@@ -170,7 +180,8 @@ extension PersonasViewController: UICollectionViewDelegateFlowLayout {
         let inset   = SFSpacing.md
         let spacing = SFSpacing.md
         let width   = (collectionView.bounds.width - inset * 2 - spacing) / 2
-        return CGSize(width: width, height: width * 1.55)
+        // Square card + room for the name label below
+        return CGSize(width: width, height: width + SFSpacing.sm + 22)
     }
 }
 
@@ -184,9 +195,9 @@ extension PersonasViewController: UINavigationControllerDelegate {
         to toVC: UIViewController
     ) -> UIViewControllerAnimatedTransitioning? {
         switch operation {
-        case .push where fromVC === self && selectedCellFrame != .zero:
+        case .push where fromVC === self && toVC is PersonaDetailViewController && selectedCellFrame != .zero:
             return CardPushAnimator(sourceFrame: selectedCellFrame)
-        case .pop where toVC === self && selectedCellFrame != .zero:
+        case .pop where toVC === self && fromVC is PersonaDetailViewController && selectedCellFrame != .zero:
             return CardPopAnimator(destinationFrame: selectedCellFrame)
         default:
             return nil

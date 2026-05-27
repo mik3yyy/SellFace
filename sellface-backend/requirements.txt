@@ -10,7 +10,7 @@ psycopg2-binary==2.9.10
 alembic==1.14.0
 
 # Redis / Celery
-celery==5.4.0
+celery[sqlalchemy]==5.4.0
 redis==5.2.0
 
 # Config

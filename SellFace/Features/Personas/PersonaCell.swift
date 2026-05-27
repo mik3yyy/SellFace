@@ -10,28 +10,8 @@ final class PersonaCell: UICollectionViewCell {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.backgroundColor = SFColors.secondaryBackground
-        iv.tintColor = SFColors.tertiaryLabel
-        iv.image = UIImage(systemName: "person.crop.rectangle.fill")?
-            .withConfiguration(UIImage.SymbolConfiguration(pointSize: 36, weight: .thin))
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
-    }()
-
-    private let gradientLayer: CAGradientLayer = {
-        let g = CAGradientLayer()
-        g.colors = [UIColor.clear.cgColor,
-                    UIColor.black.withAlphaComponent(0.75).cgColor]
-        g.locations = [0.38, 1.0]
-        return g
-    }()
-
-    private let nameLabel: UILabel = {
-        let l = UILabel()
-        l.font = SFTypography.title3()
-        l.textColor = UIColor(hex: "#F0EAE0")
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
     }()
 
     private let statusBadge: UILabel = {
@@ -45,6 +25,27 @@ final class PersonaCell: UICollectionViewCell {
         return l
     }()
 
+    // Name sits outside the card, below it
+    private let nameLabel: UILabel = {
+        let l = UILabel()
+        l.font = SFTypography.headline()
+        l.textColor = SFColors.label
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    // Pre-saved smooth dark palette — harmonises with #07070F background
+    private static let placeholderColors: [UIColor] = [
+        UIColor(hex: "#141420"),  // deep charcoal-navy
+        UIColor(hex: "#091624"),  // deep ocean navy
+        UIColor(hex: "#0F1410"),  // deep forest
+        UIColor(hex: "#190A0F"),  // deep wine
+        UIColor(hex: "#14100A"),  // deep amber
+        UIColor(hex: "#0A0F1E"),  // deep indigo
+        UIColor(hex: "#0F1918"),  // deep teal
+        UIColor(hex: "#1E0A14"),  // deep rose
+    ]
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -53,59 +54,57 @@ final class PersonaCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setupUI() {
-        contentView.addSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(card)
+        contentView.addSubview(nameLabel)
+
         NSLayoutConstraint.activate([
+            // Square card — fills full width, height = width
             card.topAnchor.constraint(equalTo: contentView.topAnchor),
             card.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             card.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            card.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            card.heightAnchor.constraint(equalTo: card.widthAnchor),
+
+            // Name label below the card, left-aligned
+            nameLabel.topAnchor.constraint(equalTo: card.bottomAnchor, constant: SFSpacing.sm),
+            nameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
+            nameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
         ])
 
         card.addSubview(imageView)
+        card.addSubview(statusBadge)
+
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: card.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: card.leadingAnchor),
             imageView.trailingAnchor.constraint(equalTo: card.trailingAnchor),
             imageView.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+
+            statusBadge.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: SFSpacing.sm),
+            statusBadge.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -SFSpacing.sm),
+            statusBadge.heightAnchor.constraint(equalToConstant: 22),
         ])
+
         imageView.layer.cornerRadius = SFSpacing.cardRadius
         imageView.layer.cornerCurve = .continuous
-
-        card.layer.addSublayer(gradientLayer)
-
-        card.addSubview(nameLabel)
-        card.addSubview(statusBadge)
-        NSLayoutConstraint.activate([
-            statusBadge.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: SFSpacing.md),
-            statusBadge.bottomAnchor.constraint(equalTo: card.bottomAnchor, constant: -SFSpacing.md),
-            statusBadge.heightAnchor.constraint(equalToConstant: 22),
-
-            nameLabel.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: SFSpacing.md),
-            nameLabel.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -SFSpacing.md),
-            nameLabel.bottomAnchor.constraint(equalTo: statusBadge.topAnchor, constant: -4),
-        ])
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        gradientLayer.frame = card.bounds
     }
 
     func configure(with persona: Persona) {
         nameLabel.text = persona.name
 
+        // Consistent color per persona derived from its ID
+        let colorIndex = abs(persona.id.hashValue) % Self.placeholderColors.count
+        card.backgroundColor = Self.placeholderColors[colorIndex]
+
         if let path = persona.localCoverImagePath,
            let img = ImageStorageManager.shared.load(fromPath: path) {
             imageView.image = img
-            imageView.contentMode = .scaleAspectFill
+            imageView.isHidden = false
         } else {
-            imageView.image = UIImage(systemName: "person.crop.rectangle.fill")?
-                .withConfiguration(UIImage.SymbolConfiguration(pointSize: 36, weight: .thin))
-            imageView.contentMode = .scaleAspectFit
+            imageView.image = nil
+            imageView.isHidden = true
         }
 
-        // Only surface non-happy states — a "Ready" card needs no label
         switch persona.status {
         case .ready, .draft:
             statusBadge.isHidden = true
@@ -115,10 +114,7 @@ final class PersonaCell: UICollectionViewCell {
             statusBadge.backgroundColor = SFColors.warning.withAlphaComponent(0.18)
             statusBadge.textColor = SFColors.warning
         case .processing:
-            statusBadge.isHidden = false
-            statusBadge.text = "  Training  "
-            statusBadge.backgroundColor = SFColors.accentLight
-            statusBadge.textColor = SFColors.accent
+            statusBadge.isHidden = true
         case .failed:
             statusBadge.isHidden = false
             statusBadge.text = "  Failed  "

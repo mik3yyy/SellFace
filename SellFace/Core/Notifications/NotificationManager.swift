@@ -4,6 +4,8 @@ import UserNotifications
 final class NotificationManager: NSObject {
     static let shared = NotificationManager()
 
+    var onNotificationTap: ((String) -> Void)?
+
     private override init() {
         super.init()
         UNUserNotificationCenter.current().delegate = self
@@ -60,7 +62,15 @@ final class NotificationManager: NSObject {
 }
 
 extension NotificationManager: UNUserNotificationCenterDelegate {
+    // Show banner + sound even when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
+    }
+
+    // User tapped the notification — fire the coordinator callback with job_id
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let userInfo = response.notification.request.content.userInfo
+        guard let jobId = userInfo["job_id"] as? String else { return }
+        await MainActor.run { onNotificationTap?(jobId) }
     }
 }

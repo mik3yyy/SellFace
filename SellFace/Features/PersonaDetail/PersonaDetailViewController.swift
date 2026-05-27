@@ -8,8 +8,7 @@ final class PersonaDetailViewController: UIViewController {
         let layout = UICollectionViewFlowLayout()
         layout.minimumLineSpacing = SFSpacing.md
         layout.minimumInteritemSpacing = SFSpacing.md
-        layout.sectionInset = UIEdgeInsets(top: SFSpacing.md, left: SFSpacing.md, bottom: SFSpacing.md, right: SFSpacing.md)
-        layout.headerReferenceSize = CGSize(width: 0, height: 140)
+        layout.sectionInset = UIEdgeInsets(top: SFSpacing.md, left: SFSpacing.md, bottom: SFSpacing.md + 20, right: SFSpacing.md)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.backgroundColor = .clear
         cv.register(StyleBundleCell.self, forCellWithReuseIdentifier: StyleBundleCell.reuseID)
@@ -21,8 +20,6 @@ final class PersonaDetailViewController: UIViewController {
         cv.translatesAutoresizingMaskIntoConstraints = false
         return cv
     }()
-
-    private let processingView = ProcessingOverlayView()
 
     init(viewModel: PersonaDetailViewModel) {
         self.viewModel = viewModel
@@ -36,7 +33,6 @@ final class PersonaDetailViewController: UIViewController {
         setupUI()
         bindViewModel()
         viewModel.loadBundles()
-        // No text on back button when pushing further
         navigationItem.backButtonDisplayMode = .minimal
     }
 
@@ -47,7 +43,6 @@ final class PersonaDetailViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // Fade title in after the card-open transition settles
         navigationController?.navigationBar.alpha = 0
         UIView.animate(withDuration: 0.30, delay: 0.10) {
             self.navigationController?.navigationBar.alpha = 1
@@ -60,28 +55,19 @@ final class PersonaDetailViewController: UIViewController {
         navigationItem.largeTitleDisplayMode = .never
 
         view.addSubview(collectionView)
-        view.addSubview(processingView)
-
-        processingView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            processingView.topAnchor.constraint(equalTo: view.topAnchor),
-            processingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            processingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            processingView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-
-        processingView.isHidden = !viewModel.isProcessing
     }
 
     private func bindViewModel() {
         viewModel.onBundlesUpdated = { [weak self] in
-            self?.collectionView.reloadData()
-            self?.processingView.isHidden = !(self?.viewModel.isProcessing ?? false)
+            guard let self else { return }
+            collectionView.collectionViewLayout.invalidateLayout()
+            collectionView.reloadData()
         }
         viewModel.onError = { [weak self] message in
             let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
@@ -91,6 +77,8 @@ final class PersonaDetailViewController: UIViewController {
     }
 }
 
+// MARK: - Data source
+
 extension PersonaDetailViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         viewModel.styleBundles.count
@@ -98,7 +86,12 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: StyleBundleCell.reuseID, for: indexPath) as! StyleBundleCell
-        cell.configure(with: viewModel.styleBundles[indexPath.item])
+        let bundle = viewModel.styleBundles[indexPath.item]
+        cell.configure(
+            with: bundle,
+            isFirstPurchase: !viewModel.hasGeneratedAnyBundle,
+            isGenerating: bundle.id == viewModel.generatingBundleId
+        )
         return cell
     }
 
@@ -108,23 +101,32 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
             withReuseIdentifier: PersonaDetailHeaderView.reuseID,
             for: indexPath
         ) as! PersonaDetailHeaderView
-        header.configure(persona: viewModel.persona)
+        header.configure(hasGeneratedAnyBundle: viewModel.hasGeneratedAnyBundle)
         return header
     }
 }
 
+// MARK: - Delegate + Layout
+
 extension PersonaDetailViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         viewModel.didTapBundle(viewModel.styleBundles[indexPath.item])
     }
 }
 
 extension PersonaDetailViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let inset = SFSpacing.md
+        let inset   = SFSpacing.md
         let spacing = SFSpacing.md
-        let width = (collectionView.bounds.width - inset * 2 - spacing) / 2
-        return CGSize(width: width, height: width * 1.5)
+        let width   = (collectionView.bounds.width - inset * 2 - spacing) / 2
+        // Square card + label area below (name row + tagline/price row)
+        return CGSize(width: width, height: width + 54)
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
+        let height: CGFloat = viewModel.hasGeneratedAnyBundle ? 44 : 162
+        return CGSize(width: collectionView.bounds.width, height: height)
     }
 }
 
@@ -133,108 +135,91 @@ extension PersonaDetailViewController: UICollectionViewDelegateFlowLayout {
 final class PersonaDetailHeaderView: UICollectionReusableView {
     static let reuseID = "PersonaDetailHeaderView"
 
-    private let titleLabel: UILabel = {
+    // First-purchase state
+    private let firstPurchaseView: UIView = {
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
+    private let nextStepLabel: UILabel = {
         let l = UILabel()
+        l.text = "NEXT STEP"
+        l.font = SFTypography.captionMedium()
+        l.textColor = SFColors.accent
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let selectTitleLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Select your bundles"
+        l.font = SFTypography.title1()
+        l.textColor = SFColors.label
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    private let descriptionLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Select bundle packs of 25 generated photos. You can also add bundles after the initial bundles have been generated."
+        l.font = SFTypography.callout()
+        l.textColor = SFColors.secondaryLabel
+        l.numberOfLines = 0
+        l.translatesAutoresizingMaskIntoConstraints = false
+        return l
+    }()
+
+    // Returning state
+    private let availableLabel: UILabel = {
+        let l = UILabel()
+        l.text = "Available bundles"
         l.font = SFTypography.title3()
         l.textColor = SFColors.secondaryLabel
-        l.text = "Available bundles"
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    private let statusCard = SFCardView()
-    private let statusLabel: UILabel = {
-        let l = UILabel()
-        l.font = SFTypography.subheadline()
-        l.textColor = SFColors.secondaryLabel
-        l.numberOfLines = 0
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        statusCard.translatesAutoresizingMaskIntoConstraints = false
-        statusCard.addSubview(statusLabel)
-        addSubview(statusCard)
-        addSubview(titleLabel)
-
-        NSLayoutConstraint.activate([
-            statusCard.topAnchor.constraint(equalTo: topAnchor, constant: SFSpacing.sm),
-            statusCard.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SFSpacing.md),
-            statusCard.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SFSpacing.md),
-
-            statusLabel.topAnchor.constraint(equalTo: statusCard.topAnchor, constant: SFSpacing.sm),
-            statusLabel.leadingAnchor.constraint(equalTo: statusCard.leadingAnchor, constant: SFSpacing.md),
-            statusLabel.trailingAnchor.constraint(equalTo: statusCard.trailingAnchor, constant: -SFSpacing.md),
-            statusLabel.bottomAnchor.constraint(equalTo: statusCard.bottomAnchor, constant: -SFSpacing.sm),
-
-            titleLabel.topAnchor.constraint(equalTo: statusCard.bottomAnchor, constant: SFSpacing.md),
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SFSpacing.md),
-            titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -SFSpacing.sm),
-        ])
+        setupUI()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func configure(persona: Persona) {
-        switch persona.status {
-        case .ready, .draft:
-            statusLabel.text = "Photos ready. Tap a style to generate your AI headshots."
-        case .processing, .uploading:
-            statusLabel.text = "Training your AI model — this takes about 20 minutes. You'll get a notification when done."
-        case .failed:
-            statusLabel.text = "Processing failed. Please try creating a new persona."
-        }
-    }
-}
-
-// MARK: - Processing Overlay
-
-final class ProcessingOverlayView: UIView {
-
-    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
-
-    private let spinner: UIActivityIndicatorView = {
-        let a = UIActivityIndicatorView(style: .large)
-        a.color = SFColors.accent
-        a.translatesAutoresizingMaskIntoConstraints = false
-        return a
-    }()
-
-    private let messageLabel: UILabel = {
-        let l = UILabel()
-        l.text = "Your images are being prepared.\nWe'll notify you when they're ready."
-        l.font = SFTypography.body()
-        l.textColor = SFColors.secondaryLabel
-        l.textAlignment = .center
-        l.numberOfLines = 0
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        blurView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(blurView)
-        blurView.contentView.addSubview(spinner)
-        blurView.contentView.addSubview(messageLabel)
+    private func setupUI() {
+        // First-purchase view
+        firstPurchaseView.addSubview(nextStepLabel)
+        firstPurchaseView.addSubview(selectTitleLabel)
+        firstPurchaseView.addSubview(descriptionLabel)
+        addSubview(firstPurchaseView)
+        addSubview(availableLabel)
 
         NSLayoutConstraint.activate([
-            blurView.topAnchor.constraint(equalTo: topAnchor),
-            blurView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            blurView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            blurView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            firstPurchaseView.topAnchor.constraint(equalTo: topAnchor, constant: SFSpacing.sm),
+            firstPurchaseView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SFSpacing.md),
+            firstPurchaseView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -SFSpacing.md),
+            firstPurchaseView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -SFSpacing.sm),
 
-            spinner.centerXAnchor.constraint(equalTo: blurView.contentView.centerXAnchor),
-            spinner.centerYAnchor.constraint(equalTo: blurView.contentView.centerYAnchor, constant: -SFSpacing.lg),
+            nextStepLabel.topAnchor.constraint(equalTo: firstPurchaseView.topAnchor),
+            nextStepLabel.leadingAnchor.constraint(equalTo: firstPurchaseView.leadingAnchor),
 
-            messageLabel.topAnchor.constraint(equalTo: spinner.bottomAnchor, constant: SFSpacing.lg),
-            messageLabel.leadingAnchor.constraint(equalTo: blurView.contentView.leadingAnchor, constant: SFSpacing.xl),
-            messageLabel.trailingAnchor.constraint(equalTo: blurView.contentView.trailingAnchor, constant: -SFSpacing.xl),
+            selectTitleLabel.topAnchor.constraint(equalTo: nextStepLabel.bottomAnchor, constant: 4),
+            selectTitleLabel.leadingAnchor.constraint(equalTo: firstPurchaseView.leadingAnchor),
+            selectTitleLabel.trailingAnchor.constraint(equalTo: firstPurchaseView.trailingAnchor),
+
+            descriptionLabel.topAnchor.constraint(equalTo: selectTitleLabel.bottomAnchor, constant: SFSpacing.sm),
+            descriptionLabel.leadingAnchor.constraint(equalTo: firstPurchaseView.leadingAnchor),
+            descriptionLabel.trailingAnchor.constraint(equalTo: firstPurchaseView.trailingAnchor),
+
+            // Returning label — vertically centered in header
+            availableLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            availableLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: SFSpacing.md),
         ])
-        spinner.startAnimating()
     }
 
-    required init?(coder: NSCoder) { fatalError() }
+    func configure(hasGeneratedAnyBundle: Bool) {
+        firstPurchaseView.isHidden = hasGeneratedAnyBundle
+        availableLabel.isHidden    = !hasGeneratedAnyBundle
+    }
 }

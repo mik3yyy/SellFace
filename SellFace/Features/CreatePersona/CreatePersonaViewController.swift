@@ -1,11 +1,15 @@
 import UIKit
 
 final class CreatePersonaViewController: UIViewController {
+    
 
     private let viewModel: CreatePersonaViewModel
     private let photoPicker = PhotoPickerManager()
 
-    // MARK: - Scroll content
+    private enum SelectionState { case empty, partial, ready }
+    private var selectionState: SelectionState = .empty
+
+    // MARK: - Scroll
 
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
@@ -17,7 +21,7 @@ final class CreatePersonaViewController: UIViewController {
     private let contentStack: UIStackView = {
         let s = UIStackView()
         s.axis = .vertical
-        s.spacing = SFSpacing.lg
+        s.spacing = SFSpacing.sm
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
@@ -42,18 +46,18 @@ final class CreatePersonaViewController: UIViewController {
 
     private let badLabel = CreatePersonaViewController.sectionTag("Avoid", color: SFColors.destructive)
     private lazy var badScrollView = buildExampleScroll(items: [
-        ("helmet.fill",   "Helmets",     false),
-        ("eye.slash.fill","Low Res",     false),
-        ("baseball.fill", "Caps",        false),
-        ("sunglasses",    "Sunglasses",  false),
+        (UIImage(named: "Helment"),  "Helmets",    false),
+        (UIImage(named: "LowRes"),   "Low Res",    false),
+        (UIImage(named: "Cap"),      "Caps",       false),
+        (UIImage(named: "Glasses"),  "Sunglasses", false),
     ])
 
     private let goodLabel = CreatePersonaViewController.sectionTag("Ideal", color: SFColors.accent)
     private lazy var goodScrollView = buildExampleScroll(items: [
-        ("person.fill",  "Good Angle",   true),
-        ("sun.max.fill", "Good Light",   true),
-        ("face.smiling", "Natural",      true),
-        ("photo.fill",   "Sharp & Clear",true),
+        (UIImage(named: "GoodAngle"),    "Good Angle",    true),
+        (UIImage(named: "GoodLighting"), "Good Light",    true),
+        (UIImage(named: "natural"),      "Natural",       true),
+        (UIImage(named: "sharp_clear"),  "Sharp & Clear", true),
     ])
 
     private let privacyCard: SFCardView = {
@@ -83,21 +87,11 @@ final class CreatePersonaViewController: UIViewController {
         return card
     }()
 
-    // MARK: - Post-selection (hidden initially)
-
-    private let selectedPhotosHeader: UILabel = {
-        let l = UILabel()
-        l.text = "Selected Photos"
-        l.font = SFTypography.title3()
-        l.textColor = SFColors.label
-        l.isHidden = true
-        return l
-    }()
+    // MARK: - Inline post-selection
 
     private let photoCountLabel: UILabel = {
         let l = UILabel()
         l.font = SFTypography.captionMedium()
-        l.textColor = SFColors.accent
         l.isHidden = true
         return l
     }()
@@ -105,7 +99,7 @@ final class CreatePersonaViewController: UIViewController {
     private lazy var selectedPhotosCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
-        layout.itemSize = CGSize(width: 88, height: 88)
+        layout.itemSize = CGSize(width: 72, height: 72)
         layout.minimumLineSpacing = SFSpacing.sm
         layout.sectionInset = UIEdgeInsets(top: 0, left: SFSpacing.md, bottom: 0, right: SFSpacing.md)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -114,52 +108,12 @@ final class CreatePersonaViewController: UIViewController {
         cv.register(SelectedPhotoCell.self, forCellWithReuseIdentifier: SelectedPhotoCell.reuseID)
         cv.isHidden = true
         cv.translatesAutoresizingMaskIntoConstraints = false
-        cv.heightAnchor.constraint(equalToConstant: 88).isActive = true
+        cv.heightAnchor.constraint(equalToConstant: 72).isActive = true
         return cv
     }()
 
-    private let nameFieldHeader: UILabel = {
-        let l = UILabel()
-        l.text = "Name this persona"
-        l.font = SFTypography.title3()
-        l.textColor = SFColors.label
-        l.isHidden = true
-        return l
-    }()
+    // MARK: - Bottom button
 
-    private let nameField: UITextField = {
-        let tf = UITextField()
-        tf.placeholder = "e.g.  Michael"
-        tf.attributedPlaceholder = NSAttributedString(
-            string: "e.g.  Michael",
-            attributes: [.foregroundColor: SFColors.tertiaryLabel]
-        )
-        tf.borderStyle = .none
-        tf.font = SFTypography.body()
-        tf.textColor = SFColors.label
-        tf.backgroundColor = SFColors.secondaryBackground
-        tf.layer.cornerRadius = SFSpacing.chipRadius
-        tf.layer.cornerCurve = .continuous
-        tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: SFSpacing.md, height: 1))
-        tf.leftViewMode = .always
-        tf.isHidden = true
-        tf.heightAnchor.constraint(equalToConstant: 54).isActive = true
-        return tf
-    }()
-
-    // MARK: - Pinned bottom button (outside scrollView)
-
-    private let uploadProgressLabel: UILabel = {
-        let l = UILabel()
-        l.font = SFTypography.subheadline()
-        l.textColor = SFColors.secondaryLabel
-        l.textAlignment = .center
-        l.isHidden = true
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-
-    // Single action button that switches between "Pick" and "Create"
     private let actionButton = SFButton(title: "Choose Photos", style: .primary, systemImage: "photo.stack")
 
     private let buttonBackdrop: UIVisualEffectView = {
@@ -169,7 +123,6 @@ final class CreatePersonaViewController: UIViewController {
         return v
     }()
 
-    private var isInCreateMode = false
     private var buttonBottomConstraint: NSLayoutConstraint!
 
     // MARK: - Init
@@ -190,12 +143,20 @@ final class CreatePersonaViewController: UIViewController {
         photoPicker.delegate = self
         selectedPhotosCollectionView.dataSource = self
         navigationItem.backButtonDisplayMode = .minimal
-        registerKeyboardObservers()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         NotificationCenter.default.removeObserver(self)
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let gradient = CAGradientLayer()
+        gradient.frame = buttonBackdrop.bounds
+        gradient.colors = [UIColor.clear.cgColor, UIColor.black.cgColor]
+        gradient.locations = [0.0, 0.5]
+        buttonBackdrop.layer.mask = gradient
     }
 
     // MARK: - Setup
@@ -205,23 +166,12 @@ final class CreatePersonaViewController: UIViewController {
         view.backgroundColor = SFColors.background
         navigationItem.largeTitleDisplayMode = .never
 
-        // Dismiss keyboard on tap or drag
-        scrollView.keyboardDismissMode = .interactive
-        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tap.cancelsTouchesInView = false
-        scrollView.addGestureRecognizer(tap)
-
-        // Scroll view (body)
         view.addSubview(scrollView)
         scrollView.addSubview(contentStack)
-
-        // Pinned bottom button + blur backdrop
         view.addSubview(buttonBackdrop)
-        view.addSubview(uploadProgressLabel)
         view.addSubview(actionButton)
 
         NSLayoutConstraint.activate([
-            // Scroll view fills screen but inset at bottom for the button
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -233,12 +183,6 @@ final class CreatePersonaViewController: UIViewController {
             contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -(SFSpacing.buttonHeight + SFSpacing.xxl)),
             contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -SFSpacing.md * 2),
 
-            // Progress label sits just above the button
-            uploadProgressLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: SFSpacing.md),
-            uploadProgressLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -SFSpacing.md),
-            uploadProgressLabel.bottomAnchor.constraint(equalTo: actionButton.topAnchor, constant: -SFSpacing.sm),
-
-            // Button pinned to bottom
             actionButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: SFSpacing.md),
             actionButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -SFSpacing.md),
             actionButton.heightAnchor.constraint(equalToConstant: SFSpacing.buttonHeight),
@@ -246,30 +190,96 @@ final class CreatePersonaViewController: UIViewController {
             buttonBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             buttonBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             buttonBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            buttonBackdrop.topAnchor.constraint(equalTo: actionButton.topAnchor, constant: -SFSpacing.xl),
+            buttonBackdrop.topAnchor.constraint(equalTo: actionButton.topAnchor, constant: -80),
         ])
 
-        // Content
+        let badScroll  = makeFullWidthScroll(badScrollView, height: 155)
+        let goodScroll = makeFullWidthScroll(goodScrollView, height: 155)
+        let photoStrip = makeFullWidthScroll(selectedPhotosCollectionView, height: 72)
+
         contentStack.addArrangedSubview(heroLabel)
         contentStack.addArrangedSubview(subtitleLabel)
+        contentStack.setCustomSpacing(SFSpacing.md, after: subtitleLabel)
         contentStack.addArrangedSubview(badLabel)
-        contentStack.addArrangedSubview(makeFullWidthScroll(badScrollView))
+        contentStack.addArrangedSubview(badScroll)
+        contentStack.setCustomSpacing(SFSpacing.md, after: badScroll)
         contentStack.addArrangedSubview(goodLabel)
-        contentStack.addArrangedSubview(makeFullWidthScroll(goodScrollView))
+        contentStack.addArrangedSubview(goodScroll)
+        contentStack.setCustomSpacing(SFSpacing.md, after: goodScroll)
         contentStack.addArrangedSubview(privacyCard)
-
-        // Post-selection content (hidden initially)
-        contentStack.addArrangedSubview(selectedPhotosHeader)
+        contentStack.setCustomSpacing(SFSpacing.lg, after: privacyCard)
         contentStack.addArrangedSubview(photoCountLabel)
-        contentStack.addArrangedSubview(makeFullWidthScroll(selectedPhotosCollectionView, height: 88))
-        contentStack.addArrangedSubview(nameFieldHeader)
-        contentStack.addArrangedSubview(nameField)
+        contentStack.setCustomSpacing(SFSpacing.sm, after: photoCountLabel)
+        contentStack.addArrangedSubview(photoStrip)
 
-        buttonBottomConstraint = actionButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -SFSpacing.md)
+        buttonBottomConstraint = actionButton.bottomAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -SFSpacing.md)
         buttonBottomConstraint.isActive = true
 
         actionButton.addTarget(self, action: #selector(didTapAction), for: .touchUpInside)
     }
+
+    // MARK: - Post-selection
+
+    private func revealPostSelectionUI() {
+        let count = viewModel.selectedImages.count
+        selectedPhotosCollectionView.reloadData()
+
+        UIView.animate(withDuration: 0.3) {
+            self.photoCountLabel.isHidden = false
+            self.selectedPhotosCollectionView.isHidden = false
+        }
+
+        if count < 10 {
+            selectionState = .partial
+            let needed = 10 - count
+            photoCountLabel.text = "\(count)/10 photos · add \(needed) more"
+            photoCountLabel.textColor = SFColors.destructive
+            updateButton(title: "Select \(needed) More", icon: "plus.circle")
+        } else {
+            selectionState = .ready
+            photoCountLabel.text = "\(count) photos selected"
+            photoCountLabel.textColor = SFColors.success
+            updateButton(title: "Continue", icon: "chevron.right")
+            pushValueProp()
+        }
+    }
+
+    private func pushValueProp() {
+        let vc = PersonaJourneyViewController(viewModel: viewModel)
+        navigationController?.pushViewController(vc, animated: true)
+    }
+
+    private func updateButton(title: String, icon: String) {
+        UIView.transition(with: actionButton, duration: 0.22, options: .transitionCrossDissolve) {
+            var cfg = self.actionButton.configuration
+            cfg?.title = title
+            cfg?.image = UIImage(systemName: icon)
+            self.actionButton.configuration = cfg
+        }
+    }
+
+    // MARK: - Bind
+
+    private func bindViewModel() {
+        viewModel.onImagesUpdated = { [weak self] in
+            self?.revealPostSelectionUI()
+        }
+    }
+
+    // MARK: - Actions
+
+    @objc private func didTapAction() {
+        switch selectionState {
+        case .empty, .partial:
+            let remaining = max(1, 15 - viewModel.selectedImages.count)
+            photoPicker.present(from: self, selectionLimit: remaining)
+        case .ready:
+            pushValueProp()
+        }
+    }
+
+    // MARK: - Helpers
 
     private func makeFullWidthScroll(_ innerView: UIView, height: CGFloat = 200) -> UIView {
         let container = UIView()
@@ -286,7 +296,7 @@ final class CreatePersonaViewController: UIViewController {
         return container
     }
 
-    private func buildExampleScroll(items: [(icon: String, label: String, good: Bool)]) -> UIScrollView {
+    private func buildExampleScroll(items: [(image: UIImage?, label: String, good: Bool)]) -> UIScrollView {
         let sv = UIScrollView()
         sv.showsHorizontalScrollIndicator = false
         let stack = UIStackView()
@@ -301,14 +311,14 @@ final class CreatePersonaViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: sv.bottomAnchor, constant: -SFSpacing.xs),
         ])
         for item in items {
-            let card = buildExampleCard(icon: item.icon, label: item.label, good: item.good)
+            let card = buildExampleCard(image: item.image, label: item.label, good: item.good)
             stack.addArrangedSubview(card)
             card.widthAnchor.constraint(equalToConstant: 130).isActive = true
         }
         return sv
     }
 
-    private func buildExampleCard(icon: String, label: String, good: Bool) -> UIView {
+    private func buildExampleCard(image: UIImage?, label: String, good: Bool) -> UIView {
         let card = SFCardView()
         card.clipsToBounds = true
         card.translatesAutoresizingMaskIntoConstraints = false
@@ -318,12 +328,32 @@ final class CreatePersonaViewController: UIViewController {
         let bg = UIView()
         bg.backgroundColor = color.withAlphaComponent(0.07)
         bg.translatesAutoresizingMaskIntoConstraints = false
+        bg.clipsToBounds = true
 
-        let iconView = UIImageView(image: UIImage(systemName: icon)?
-            .withConfiguration(UIImage.SymbolConfiguration(pointSize: 40, weight: .thin)))
-        iconView.tintColor = color
-        iconView.contentMode = .scaleAspectFit
+        let iconView = UIImageView(image: image)
         iconView.translatesAutoresizingMaskIntoConstraints = false
+
+        card.addSubview(bg)
+        bg.addSubview(iconView)
+
+        if image?.isSymbolImage == true {
+            iconView.tintColor = color
+            iconView.contentMode = .scaleAspectFit
+            NSLayoutConstraint.activate([
+                iconView.centerXAnchor.constraint(equalTo: bg.centerXAnchor),
+                iconView.centerYAnchor.constraint(equalTo: bg.centerYAnchor),
+                iconView.widthAnchor.constraint(equalToConstant: 48),
+                iconView.heightAnchor.constraint(equalToConstant: 48),
+            ])
+        } else {
+            iconView.contentMode = .scaleAspectFill
+            NSLayoutConstraint.activate([
+                iconView.topAnchor.constraint(equalTo: bg.topAnchor),
+                iconView.leadingAnchor.constraint(equalTo: bg.leadingAnchor),
+                iconView.trailingAnchor.constraint(equalTo: bg.trailingAnchor),
+                iconView.bottomAnchor.constraint(equalTo: bg.bottomAnchor),
+            ])
+        }
 
         let badgeImg = UIImage(systemName: good ? "checkmark.circle.fill" : "xmark.circle.fill")
         let badge = UIImageView(image: badgeImg)
@@ -338,8 +368,6 @@ final class CreatePersonaViewController: UIViewController {
         lbl.numberOfLines = 2
         lbl.translatesAutoresizingMaskIntoConstraints = false
 
-        card.addSubview(bg)
-        bg.addSubview(iconView)
         card.addSubview(badge)
         card.addSubview(lbl)
 
@@ -348,11 +376,6 @@ final class CreatePersonaViewController: UIViewController {
             bg.leadingAnchor.constraint(equalTo: card.leadingAnchor),
             bg.trailingAnchor.constraint(equalTo: card.trailingAnchor),
             bg.heightAnchor.constraint(equalToConstant: 110),
-
-            iconView.centerXAnchor.constraint(equalTo: bg.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: bg.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 48),
-            iconView.heightAnchor.constraint(equalToConstant: 48),
 
             badge.topAnchor.constraint(equalTo: card.topAnchor, constant: SFSpacing.sm),
             badge.trailingAnchor.constraint(equalTo: card.trailingAnchor, constant: -SFSpacing.sm),
@@ -375,118 +398,13 @@ final class CreatePersonaViewController: UIViewController {
         l.setTracking(1.8)
         return l
     }
-
-    // MARK: - Bind
-
-    private func bindViewModel() {
-        viewModel.onImagesUpdated = { [weak self] in
-            self?.revealPostSelectionUI()
-        }
-        viewModel.onProgress = { [weak self] uploaded, total in
-            guard let self else { return }
-            uploadProgressLabel.isHidden = false
-            uploadProgressLabel.text = "Uploading photo \(uploaded) of \(total)…"
-        }
-        viewModel.onCreationComplete = { [weak self] persona in
-            guard let self else { return }
-            actionButton.setLoading(false)
-            uploadProgressLabel.isHidden = true
-            viewModel.coordinator?.showPersonaDetail(persona)
-        }
-        viewModel.onError = { [weak self] message in
-            guard let self else { return }
-            actionButton.setLoading(false)
-            uploadProgressLabel.isHidden = true
-            let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            self.present(alert, animated: true)
-        }
-    }
-
-    private func revealPostSelectionUI() {
-        let count = viewModel.selectedImages.count
-        selectedPhotosCollectionView.reloadData()
-
-        UIView.animate(withDuration: 0.36, delay: 0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0) {
-            [self.selectedPhotosHeader, self.photoCountLabel,
-             self.selectedPhotosCollectionView, self.nameFieldHeader,
-             self.nameField].forEach { $0.isHidden = false }
-        }
-
-        photoCountLabel.text = "\(count) photo\(count == 1 ? "" : "s") selected"
-
-        // Switch button to "Create" mode
-        if !isInCreateMode {
-            isInCreateMode = true
-            UIView.transition(with: actionButton, duration: 0.22, options: .transitionCrossDissolve) {
-                var cfg = self.actionButton.configuration
-                cfg?.title = "Create Persona"
-                cfg?.image = UIImage(systemName: "sparkles")
-                self.actionButton.configuration = cfg
-            }
-        }
-
-        // Scroll down to reveal name field
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) { [weak self] in
-            guard let self else { return }
-            let bottom = CGPoint(x: 0, y: scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom)
-            if bottom.y > 0 { scrollView.setContentOffset(bottom, animated: true) }
-            nameField.becomeFirstResponder()
-        }
-    }
-
-    // MARK: - Keyboard
-
-    private func registerKeyboardObservers() {
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
-    }
-
-    @objc private func keyboardWillShow(_ notification: Notification) {
-        guard let info = notification.userInfo,
-              let frame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
-              let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-              let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
-        let overlap = frame.height - view.safeAreaInsets.bottom
-        buttonBottomConstraint.constant = -(overlap + SFSpacing.md)
-        UIView.animate(withDuration: duration, delay: 0, options: .init(rawValue: curveRaw << 16)) {
-            self.view.layoutIfNeeded()
-        }
-    }
-
-    @objc private func keyboardWillHide(_ notification: Notification) {
-        guard let info = notification.userInfo,
-              let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-              let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
-        buttonBottomConstraint.constant = -SFSpacing.md
-        UIView.animate(withDuration: duration, delay: 0, options: .init(rawValue: curveRaw << 16)) {
-            self.view.layoutIfNeeded()
-        }
-    }
-
-    @objc private func dismissKeyboard() {
-        view.endEditing(true)
-    }
-
-    // MARK: - Actions
-
-    @objc private func didTapAction() {
-        if isInCreateMode {
-            nameField.resignFirstResponder()
-            actionButton.setLoading(true)
-            viewModel.createPersona(name: nameField.text ?? "")
-        } else {
-            nameField.resignFirstResponder()
-            photoPicker.present(from: self)
-        }
-    }
 }
 
 // MARK: - Photo picker delegate
 
 extension CreatePersonaViewController: PhotoPickerManagerDelegate {
     func photoPickerManager(_ manager: PhotoPickerManager, didSelect images: [UIImage]) {
-        viewModel.didSelectImages(images)
+        viewModel.addImages(images)
     }
     func photoPickerManagerDidCancel(_ manager: PhotoPickerManager) {}
 }

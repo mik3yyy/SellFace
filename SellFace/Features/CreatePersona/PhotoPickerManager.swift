@@ -11,13 +11,10 @@ final class PhotoPickerManager: NSObject {
     weak var delegate: PhotoPickerManagerDelegate?
     weak var presentingViewController: UIViewController?
 
-    private let minCount = 10
-    private let maxCount = 15
-
-    func present(from viewController: UIViewController) {
+    func present(from viewController: UIViewController, selectionLimit: Int = 15) {
         presentingViewController = viewController
         var config = PHPickerConfiguration(photoLibrary: .shared())
-        config.selectionLimit = maxCount
+        config.selectionLimit = selectionLimit
         config.filter = .images
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = self
@@ -41,7 +38,6 @@ extension PhotoPickerManager: PHPickerViewControllerDelegate {
                 self.delegate?.photoPickerManagerDidCancel(self)
                 return
             }
-
             var images: [UIImage] = []
             for result in results {
                 guard result.itemProvider.canLoadObject(ofClass: UIImage.self) else { continue }
@@ -49,24 +45,9 @@ extension PhotoPickerManager: PHPickerViewControllerDelegate {
                     images.append(image)
                 }
             }
-
-            if images.count < self.minCount {
-                self.showCountError(from: self.presentingViewController)
-            } else {
-                self.delegate?.photoPickerManager(self, didSelect: Array(images.prefix(self.maxCount)))
+            if !images.isEmpty {
+                self.delegate?.photoPickerManager(self, didSelect: images)
             }
         }
-    }
-
-    private func showCountError(from vc: UIViewController?) {
-        guard let vc else { return }
-        let alert = UIAlertController(
-            title: "Not Enough Photos",
-            message: "Please select at least \(minCount) photos for best results.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        vc.present(alert, animated: true)
-        delegate?.photoPickerManagerDidCancel(self)
     }
 }
