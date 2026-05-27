@@ -8,10 +8,7 @@ final class PersonaDetailViewModel {
 
     private(set) var styleBundles: [StyleBundle] = []
     private(set) var generatingBundleId: String?
-    private var bundlePreviewImages: [String: UIImage] = [:]  // productId → UIImage (this VM instance)
-
-    // Survives back-navigation and ViewModel recreation within the same app session
-    private static var sessionImageCache: [String: (url: String, image: UIImage)] = [:]
+    private var bundlePreviewImages: [String: UIImage] = [:]  // productId → UIImage (fast lookup for this VM)
 
     var hasGeneratedAnyBundle: Bool {
         LocalStorageManager.shared.hasGeneratedBundle(forPersonaId: persona.id)
@@ -71,9 +68,8 @@ final class PersonaDetailViewModel {
                 oldPrice = nil
             }
 
-            // Check session cache — if hit, set previewImageUrl immediately (no shimmer on re-navigation)
-            let cacheKey = "\(persona.id)_\(product.id)"
-            let cached = Self.sessionImageCache[cacheKey]
+            // Check persistent cache — if hit, set previewImageUrl immediately (no shimmer on re-navigation or relaunch)
+            let cached = BundleImageCache.shared.get(personaId: persona.id, productId: product.id)
             bundlePreviewImages[product.id] = cached?.image
 
             return StyleBundle(
@@ -134,7 +130,7 @@ final class PersonaDetailViewModel {
                 styleBundles[i].isCheckingPreview = false
                 if let url, let image {
                     bundlePreviewImages[productId] = image
-                    Self.sessionImageCache["\(persona.id)_\(productId)"] = (url: url, image: image)
+                    BundleImageCache.shared.store(personaId: persona.id, productId: productId, url: url, image: image)
                 }
                 onBundlesUpdated?()
             }
