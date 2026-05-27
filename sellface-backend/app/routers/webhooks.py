@@ -198,7 +198,7 @@ async def _on_prompt_complete(job_id: str, prompt: dict) -> None:
         notification_service.send_job_failed(tokens, persona_name)
         return
 
-    image_urls = [img["url"] for img in image_entries if img.get("url")]
+    image_urls = [img for img in image_entries if isinstance(img, str) and img]
     logger.info("Downloading %d images for job %s", len(image_urls), job_id)
 
     async with AsyncSessionLocal() as db:

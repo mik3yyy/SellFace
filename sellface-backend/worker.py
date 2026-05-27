@@ -232,7 +232,7 @@ async def check_astria_fallback(job: GenerationJob) -> None:
         logger.debug("Fallback: job %s images not ready yet", job.id)
         return
 
-    image_urls = [img["url"] for img in prompt.get("images", []) if img.get("url")]
+    image_urls = [img for img in prompt.get("images", []) if isinstance(img, str) and img]
     if not image_urls:
         return
 
