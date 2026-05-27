@@ -9,7 +9,7 @@ import os
 
 from app.config import get_settings
 from app.database import engine, AsyncSessionLocal
-from app.routers import personas, generation_jobs, styles, devices, admin
+from app.routers import personas, generation_jobs, styles, devices, admin, webhooks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,6 +58,7 @@ app.include_router(generation_jobs.router)
 app.include_router(styles.router)
 app.include_router(devices.router)
 app.include_router(admin.router)
+app.include_router(webhooks.router)
 
 # Serve admin dashboard HTML
 _static_dir = os.path.join(os.path.dirname(__file__), "static")

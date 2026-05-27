@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     debug: bool = False
     secret_key: str = "change-me-in-production"
     admin_secret: str = "change-admin-secret-in-production"
+    # Public base URL — used to build Astria webhook callback URLs
+    app_base_url: str = ""  # e.g. https://sellface-api.onrender.com
 
     # APNs — leave empty to disable push notifications
     apns_key_id: str = ""

@@ -133,7 +133,7 @@ def _url(path: str) -> str:
 
 # ── Tune (training) ────────────────────────────────────────────────────────────
 
-def create_tune(title: str, image_urls: list[str], subject_keyword: str = "man") -> dict:
+def create_tune(title: str, image_urls: list[str], subject_keyword: str = "man", callback_url: str = "") -> dict:
     """
     Submit a fine-tuning job to Astria.
 
@@ -154,7 +154,8 @@ def create_tune(title: str, image_urls: list[str], subject_keyword: str = "man")
         data["tune[model_type]"] = "lora"
         data["tune[base_tune_id]"] = str(FLUX_BASE_TUNE_ID)
         data["tune[preset]"] = "flux-lora-portrait"
-    # Do NOT pass tune[callback] — empty string is rejected as invalid URL
+    if callback_url:
+        data["tune[callback]"] = callback_url
     # Astria expects repeated keys for arrays
     for url in image_urls:
         data.setdefault("tune[image_urls][]", [])
@@ -193,7 +194,7 @@ def is_tune_failed(tune: dict) -> bool:
 
 # ── Prompts (generation) ───────────────────────────────────────────────────────
 
-def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") -> dict:
+def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man", callback_url: str = "") -> dict:
     """
     Submit a generation prompt to an already-trained tune.
 
@@ -231,7 +232,8 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
             "steps": 30,
             "cfg_scale": 7.5,
         }
-    # Do NOT pass callback — empty string is rejected as invalid URL
+    if callback_url:
+        prompt_body["callback"] = callback_url
 
     payload = {"prompt": prompt_body}
     logger.info("Creating Astria prompt for tune %s via endpoint tune %s | style=%s", tune_id, endpoint_tune_id, style_name)

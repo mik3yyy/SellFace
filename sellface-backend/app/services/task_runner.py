@@ -1,9 +1,9 @@
 """
-Async background task runner — replaces Celery for training + generation.
+Async background task runner — submits work to Astria and exits.
+Completion is handled by Astria webhooks (POST /webhooks/astria-tune/{id}
+and POST /webhooks/astria-prompt/{id}).
 
-Runs inside the FastAPI event loop via asyncio.create_task().
-Blocking I/O (Astria, Cloudinary) is offloaded to a thread pool via asyncio.to_thread().
-No Redis or separate worker process required.
+Falls back to a short polling loop when APP_BASE_URL is not set (local dev).
 """
 import asyncio
 import logging
@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.database import AsyncSessionLocal
 from app.models.persona import Persona, PersonaStatus
 from app.models.generation_job import GenerationJob, GenerationStatus
@@ -23,31 +24,30 @@ from app.services import astria_service, cloudinary_service, notification_servic
 
 logger = logging.getLogger(__name__)
 
-TRAIN_POLL = 60   # seconds between Astria training polls
-GEN_POLL   = 30   # seconds between Astria generation polls
+TRAIN_POLL = 60   # seconds between training polls (fallback only)
+GEN_POLL   = 15   # seconds between generation polls (fallback only)
 
 
 async def run_train_and_generate(persona_id: str, job_id: str) -> None:
-    """Entry point — trains the LoRA then generates images for the job."""
     try:
-        await _train_persona(persona_id)
-        await _generate_job(job_id)
+        await _submit_tune(persona_id, job_id)
     except Exception:
         logger.exception("Background task failed: persona=%s job=%s", persona_id, job_id)
 
 
 async def run_generate_only(job_id: str) -> None:
-    """Entry point — persona already trained, just generate images."""
     try:
-        await _generate_job(job_id)
+        await _submit_prompt(job_id)
     except Exception:
         logger.exception("Generation task failed: job=%s", job_id)
 
 
-# ── Training ───────────────────────────────────────────────────────────────────
+# ── Training submission ────────────────────────────────────────────────────────
 
-async def _train_persona(persona_id: str) -> None:
-    # ── Submit tune to Astria ────────────────────────────────────────────────
+async def _submit_tune(persona_id: str, job_id: str) -> None:
+    """Submit fine-tuning job to Astria. Webhook handles completion."""
+    settings = get_settings()
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Persona).where(Persona.id == persona_id)
@@ -55,62 +55,73 @@ async def _train_persona(persona_id: str) -> None:
         )
         persona = result.scalar_one_or_none()
         if not persona or persona.status in (PersonaStatus.ready, PersonaStatus.failed):
+            # Already trained — go straight to generation
+            await _submit_prompt(job_id)
             return
 
-        if not persona.astria_tune_id:
-            image_urls = [img.remote_url for img in persona.images if img.remote_url]
-            if not image_urls:
-                logger.error("No training images for persona %s", persona_id)
-                return
-            try:
-                tune = await asyncio.to_thread(
-                    astria_service.create_tune,
-                    title=persona.name,
-                    image_urls=image_urls,
-                    subject_keyword=persona.subject_keyword,
-                )
-            except Exception as e:
-                logger.error("create_tune failed for persona %s: %s", persona_id, e)
-                persona.status = PersonaStatus.failed
-                await db.commit()
-                return
-            persona.astria_tune_id = tune["id"]
-            persona.status = PersonaStatus.processing
-            await db.commit()
-            logger.info("Submitted Astria tune %s for persona %s", tune["id"], persona_id)
+        if persona.astria_tune_id:
+            # Tune exists (may be training) — just submit the prompt
+            await _submit_prompt(job_id)
+            return
 
-    # ── Poll until trained (up to 90 min) ────────────────────────────────────
+        image_urls = [img.remote_url for img in persona.images if img.remote_url]
+        if not image_urls:
+            logger.error("No training images for persona %s", persona_id)
+            return
+
+        callback_url = ""
+        if settings.app_base_url:
+            callback_url = f"{settings.app_base_url.rstrip('/')}/webhooks/astria-tune/{persona_id}"
+
+        try:
+            tune = await asyncio.to_thread(
+                astria_service.create_tune,
+                title=persona.name,
+                image_urls=image_urls,
+                subject_keyword=persona.subject_keyword,
+                callback_url=callback_url,
+            )
+        except Exception as e:
+            logger.error("create_tune failed for persona %s: %s", persona_id, e)
+            persona.status = PersonaStatus.failed
+            await db.commit()
+            return
+
+        persona.astria_tune_id = tune["id"]
+        persona.status = PersonaStatus.processing
+        await db.commit()
+        logger.info("Submitted Astria tune %s for persona %s (webhook: %s)",
+                    tune["id"], persona_id, callback_url or "polling")
+
+    # If no webhook URL, fall back to polling so it works locally
+    if not settings.app_base_url:
+        await _poll_tune_then_prompt(persona_id, job_id)
+
+
+async def _poll_tune_then_prompt(persona_id: str, job_id: str) -> None:
+    """Fallback polling used only when APP_BASE_URL is not set (local dev)."""
     for _ in range(90):
         await asyncio.sleep(TRAIN_POLL)
         async with AsyncSessionLocal() as db:
-            persona = await db.get(Persona, persona_id, options=[selectinload(Persona.images)])
+            persona = await db.get(Persona, persona_id)
             if not persona:
                 return
             try:
                 tune = await asyncio.to_thread(astria_service.get_tune, persona.astria_tune_id)
             except Exception as e:
-                logger.warning("get_tune failed for persona %s: %s — retrying", persona_id, e)
+                logger.warning("get_tune failed: %s — retrying", e)
                 continue
 
             if astria_service.is_tune_failed(tune):
                 persona.status = PersonaStatus.failed
                 await db.commit()
-                logger.error("Astria training failed for persona %s: %s", persona_id, tune.get("error"))
                 return
 
             if astria_service.is_tune_ready(tune):
                 persona.status = PersonaStatus.ready
-                # Delete training images from Cloudinary — baked into the LoRA now
-                for img in persona.images:
-                    if img.cloudinary_public_id:
-                        try:
-                            await asyncio.to_thread(cloudinary_service.delete_image, img.cloudinary_public_id)
-                        except Exception:
-                            pass
-                        img.cloudinary_public_id = None
-                        img.remote_url = None
                 await db.commit()
-                logger.info("Training complete for persona %s", persona_id)
+                logger.info("Training complete for persona %s (polling)", persona_id)
+                await _submit_prompt(job_id)
                 return
 
     logger.error("Training timed out for persona %s", persona_id)
@@ -121,10 +132,12 @@ async def _train_persona(persona_id: str) -> None:
             await db.commit()
 
 
-# ── Generation ─────────────────────────────────────────────────────────────────
+# ── Prompt submission ──────────────────────────────────────────────────────────
 
-async def _generate_job(job_id: str) -> None:
-    # ── Load job and wait for persona to be ready ────────────────────────────
+async def _submit_prompt(job_id: str) -> None:
+    """Submit image generation prompt to Astria. Webhook handles completion."""
+    settings = get_settings()
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(GenerationJob).where(GenerationJob.id == job_id)
@@ -138,55 +151,77 @@ async def _generate_job(job_id: str) -> None:
         if not job or job.status == GenerationStatus.completed:
             return
 
-        persona_id   = job.persona_id
         tune_id      = job.persona.astria_tune_id
         style_name   = job.style_bundle.name
         subject_kw   = job.persona.subject_keyword
-        persona_name = job.persona.name
         tokens       = [dt.token for dt in job.user.device_tokens if dt.is_active]
+        persona_name = job.persona.name
+        persona_status = job.persona.status
 
-        # Wait for training if not ready yet (covers the case where generation was
-        # queued before training finished — can happen with first-time persona)
-        for _ in range(90):
-            if job.persona.status == PersonaStatus.ready:
-                break
-            if job.persona.status == PersonaStatus.failed:
+        # Wait up to 90 min for training if not ready yet
+        if persona_status != PersonaStatus.ready:
+            for _ in range(90):
+                if job.persona.status == PersonaStatus.ready:
+                    break
+                if job.persona.status == PersonaStatus.failed:
+                    job.status = GenerationStatus.failed
+                    job.error_message = "Persona training failed"
+                    await db.commit()
+                    notification_service.send_job_failed(tokens, persona_name)
+                    return
+                await asyncio.sleep(TRAIN_POLL)
+                await db.refresh(job.persona)
+                tune_id = job.persona.astria_tune_id
+            else:
                 job.status = GenerationStatus.failed
-                job.error_message = "Persona training failed"
+                job.error_message = "Training did not complete in time"
                 await db.commit()
                 notification_service.send_job_failed(tokens, persona_name)
                 return
-            await asyncio.sleep(TRAIN_POLL)
-            await db.refresh(job.persona)
-            tune_id = job.persona.astria_tune_id
-        else:
-            job.status = GenerationStatus.failed
-            job.error_message = "Training did not complete in time"
-            await db.commit()
-            notification_service.send_job_failed(tokens, persona_name)
-            return
 
-        # ── Submit prompt to Astria ──────────────────────────────────────────
         job.status = GenerationStatus.processing
         await db.commit()
-        try:
-            prompt = await asyncio.to_thread(
-                astria_service.create_prompts,
-                tune_id=tune_id,
-                style_name=style_name,
-                subject_keyword=subject_kw,
-            )
-        except Exception as e:
-            logger.error("create_prompts failed for job %s: %s", job_id, e)
-            job.status = GenerationStatus.failed
-            job.error_message = str(e)
+
+    callback_url = ""
+    if settings.app_base_url:
+        callback_url = f"{settings.app_base_url.rstrip('/')}/webhooks/astria-prompt/{job_id}"
+
+    try:
+        prompt = await asyncio.to_thread(
+            astria_service.create_prompts,
+            tune_id=tune_id,
+            style_name=style_name,
+            subject_keyword=subject_kw,
+            callback_url=callback_url,
+        )
+    except Exception as e:
+        logger.error("create_prompts failed for job %s: %s", job_id, e)
+        async with AsyncSessionLocal() as db:
+            job_row = await db.get(GenerationJob, job_id)
+            if job_row:
+                job_row.status = GenerationStatus.failed
+                job_row.error_message = str(e)
+                await db.commit()
+        notification_service.send_job_failed(tokens, persona_name)
+        return
+
+    # Persist prompt_id immediately — survives server restarts
+    async with AsyncSessionLocal() as db:
+        job_row = await db.get(GenerationJob, job_id)
+        if job_row:
+            job_row.astria_prompt_id = prompt["id"]
             await db.commit()
-            notification_service.send_job_failed(tokens, persona_name)
-            return
+    logger.info("Astria prompt %s submitted for job %s (webhook: %s)",
+                prompt["id"], job_id, callback_url or "polling")
 
-        prompt_id = prompt["id"]
+    # If no webhook URL, fall back to polling
+    if not settings.app_base_url:
+        await _poll_prompt(job_id, tune_id, prompt["id"], tokens, persona_name)
 
-    # ── Poll for generated images (up to 40 min) ─────────────────────────────
+
+async def _poll_prompt(job_id: str, tune_id: int, prompt_id: int,
+                       tokens: list[str], persona_name: str) -> None:
+    """Fallback polling used only when APP_BASE_URL is not set (local dev)."""
     for _ in range(80):
         await asyncio.sleep(GEN_POLL)
         try:
@@ -199,7 +234,7 @@ async def _generate_job(job_id: str) -> None:
             continue
 
         image_urls = [img["url"] for img in prompt.get("images", []) if img.get("url")]
-        logger.info("Astria returned %d images for job %s", len(image_urls), job_id)
+        logger.info("Astria returned %d images for job %s (polling)", len(image_urls), job_id)
 
         async with AsyncSessionLocal() as db:
             folder = f"sellface/generated/{job_id}"
@@ -213,7 +248,7 @@ async def _generate_job(job_id: str) -> None:
                     final_url = upload_result["url"]
                     cld_id    = upload_result.get("public_id")
                 except Exception as e:
-                    logger.warning("Image %d upload failed for job %s: %s — using direct URL", idx, job_id, e)
+                    logger.warning("Image %d upload failed for job %s: %s", idx, job_id, e)
                     final_url = astria_url
                     cld_id    = None
 
@@ -229,12 +264,11 @@ async def _generate_job(job_id: str) -> None:
                 job_row.status      = GenerationStatus.completed
                 job_row.completed_at = datetime.now(timezone.utc)
             await db.commit()
-            logger.info("Job %s completed with %d images", job_id, len(image_urls))
+            logger.info("Job %s completed via polling with %d images", job_id, len(image_urls))
 
         notification_service.send_images_ready(tokens, persona_name, job_id)
         return
 
-    # Timed out
     logger.error("Generation timed out for job %s", job_id)
     async with AsyncSessionLocal() as db:
         job_row = await db.get(GenerationJob, job_id)
