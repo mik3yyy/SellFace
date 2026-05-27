@@ -76,9 +76,11 @@ final class PersonaDetailViewController: UIViewController {
             guard let self else { return }
             collectionView.collectionViewLayout.invalidateLayout()
             collectionView.reloadData()
+            // Async case: bundles loaded after viewDidAppear (StoreKit/API slow path)
             if !hasAnimatedEntrance && !viewModel.styleBundles.isEmpty && view.window != nil {
                 hasAnimatedEntrance = true
-                DispatchQueue.main.async { self.collectionView.animateCellsEntrance() }
+                collectionView.layoutIfNeeded()   // cells need frames before animating
+                collectionView.animateCellsEntrance()
             }
         }
         viewModel.onError = { [weak self] message in
@@ -105,6 +107,11 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
             isGenerating: bundle.id == viewModel.generatingBundleId,
             previewImage: viewModel.previewImage(for: bundle)
         )
+        // Start cells invisible so entrance animation reveals them (no flash)
+        if !hasAnimatedEntrance {
+            cell.alpha = 0
+            cell.transform = CGAffineTransform(translationX: 0, y: 28)
+        }
         return cell
     }
 
@@ -249,12 +256,13 @@ extension PersonaDetailViewController: UINavigationControllerDelegate {
         from fromVC: UIViewController,
         to toVC: UIViewController
     ) -> UIViewControllerAnimatedTransitioning? {
-        if operation == .push,
-           fromVC === self,
-           toVC is ResultsViewController,
-           selectedCellFrame != .zero {
+        switch operation {
+        case .push where fromVC === self && toVC is ResultsViewController && selectedCellFrame != .zero:
             return CardPushAnimator(sourceFrame: selectedCellFrame)
+        case .pop where fromVC is ResultsViewController && toVC === self && selectedCellFrame != .zero:
+            return CardPopAnimator(destinationFrame: selectedCellFrame)
+        default:
+            return nil
         }
-        return nil
     }
 }
