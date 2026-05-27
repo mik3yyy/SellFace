@@ -4,7 +4,7 @@ import logging
 from functools import partial
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -14,6 +14,7 @@ from app.models.persona import Persona, PersonaStatus
 from app.models.persona_image import PersonaImage
 from app.models.generation_job import GenerationJob, GenerationStatus
 from app.models.generated_image import GeneratedImage
+from app.models.style_bundle import StyleBundle
 from app.schemas.persona import PersonaCreate, PersonaOut, PersonaDetailOut, PersonaImageOut
 from app.schemas.generation_job import GeneratedImageOut
 from app.services import cloudinary_service
@@ -171,7 +172,14 @@ async def get_persona_results(
         .order_by(GeneratedImage.created_at.desc())
     )
     if style_bundle_id:
-        query = query.where(GenerationJob.style_bundle_id == style_bundle_id)
+        # Accept short slug ("linkedin"), product_id ("com.sellface.style.linkedin"), or UUID
+        sb_res = await db.execute(
+            select(StyleBundle.id).where(
+                or_(StyleBundle.id == style_bundle_id, StyleBundle.product_id == style_bundle_id)
+            )
+        )
+        resolved_id = sb_res.scalar_one_or_none() or style_bundle_id
+        query = query.where(GenerationJob.style_bundle_id == resolved_id)
 
     result = await db.execute(query)
     return [GeneratedImageOut.model_validate(i) for i in result.scalars().all()]
