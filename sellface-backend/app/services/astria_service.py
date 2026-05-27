@@ -200,7 +200,7 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
     Returns the prompt dict including `id`.
     Images fill in asynchronously — poll get_prompt() until `images` is non-empty.
     """
-    trigger = f"ohwx {subject_keyword}"
+    trigger = f"sks {subject_keyword}" if settings.astria_branch == "flux1" else f"ohwx {subject_keyword}"
     style_key = style_name.lower().strip()
     positive, negative = STYLE_PROMPTS.get(style_key, (
         f"professional portrait of {trigger}, photorealistic, high quality",
@@ -215,7 +215,6 @@ def create_prompts(tune_id: int, style_name: str, subject_keyword: str = "man") 
         endpoint_tune_id = FLUX_BASE_TUNE_ID
         prompt_body = {
             "text": positive,
-            "negative_prompt": negative,
             "num_images": settings.effective_images_per_job,
             "w": 768,
             "h": 1024,
