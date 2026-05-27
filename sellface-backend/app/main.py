@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 import os
@@ -38,21 +38,32 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Native iOS clients don't send CORS Origin headers, so this only affects
-# browser-based access (Swagger UI, admin dashboard). Restrict in production
-# by setting ALLOWED_ORIGINS in .env.
-# "null" covers file:// pages (local admin tool); "*" covers everything else in debug
-_allowed_origins = (
-    ["*", "null"] if settings.debug
-    else ["https://sellface.app", "https://www.sellface.app"]
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# In debug mode use a custom middleware so file:// pages (null origin) work too.
+# In production, use strict CORSMiddleware.
+if settings.debug:
+    @app.middleware("http")
+    async def dev_cors(request: Request, call_next):
+        origin = request.headers.get("origin", "*")
+        if request.method == "OPTIONS":
+            return Response(status_code=200, headers={
+                "Access-Control-Allow-Origin":  origin,
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Max-Age":       "600",
+            })
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"]  = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://sellface.app", "https://www.sellface.app"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(personas.router)
 app.include_router(generation_jobs.router)
