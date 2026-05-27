@@ -4,8 +4,6 @@ final class PersonaDetailViewController: UIViewController {
 
     private let viewModel: PersonaDetailViewModel
     private var selectedCellFrame: CGRect = .zero
-    private var hasAnimatedEntrance = false
-    private var isViewAppeared = false
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -48,14 +46,9 @@ final class PersonaDetailViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        isViewAppeared = true
         navigationController?.navigationBar.alpha = 0
         UIView.animate(withDuration: 0.30, delay: 0.10) {
             self.navigationController?.navigationBar.alpha = 1
-        }
-        if !hasAnimatedEntrance && !viewModel.styleBundles.isEmpty {
-            hasAnimatedEntrance = true
-            collectionView.animateCellsEntrance()
         }
     }
 
@@ -78,14 +71,6 @@ final class PersonaDetailViewController: UIViewController {
             guard let self else { return }
             collectionView.collectionViewLayout.invalidateLayout()
             collectionView.reloadData()
-            // Async case: bundles arrive after viewDidAppear (slow StoreKit / API)
-            // isViewAppeared guard prevents premature trigger from viewWillAppear/viewDidLoad
-            // hasAnimatedEntrance is set AFTER layoutIfNeeded so cellForItemAt still pre-hides cells
-            if isViewAppeared && !hasAnimatedEntrance && !viewModel.styleBundles.isEmpty {
-                collectionView.layoutIfNeeded()
-                hasAnimatedEntrance = true
-                collectionView.animateCellsEntrance()
-            }
         }
         viewModel.onError = { [weak self] message in
             let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
@@ -111,11 +96,6 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
             isGenerating: bundle.id == viewModel.generatingBundleId,
             previewImage: viewModel.previewImage(for: bundle)
         )
-        // Start cells invisible so entrance animation reveals them (no flash)
-        if !hasAnimatedEntrance {
-            cell.alpha = 0
-            cell.transform = CGAffineTransform(translationX: 0, y: 28)
-        }
         return cell
     }
 
