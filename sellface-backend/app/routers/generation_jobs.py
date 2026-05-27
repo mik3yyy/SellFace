@@ -82,20 +82,21 @@ async def create_generation_job(
     await db.commit()
     await db.refresh(job)
 
-    # Kick off background work — no Redis/Celery needed.
-    # Check astria_tune_id (not status) as the source of truth for whether training happened.
-    # A persona can be stuck in "processing" without a tune_id if a previous attempt failed.
     if not persona.astria_tune_id:
-        # Training has never been submitted — run train → generate
+        # Training has never been submitted — submit tune first, then generate
         if persona.status == PersonaStatus.draft:
             persona.status = PersonaStatus.processing
             await db.commit()
         asyncio.create_task(run_train_and_generate(persona.id, job.id))
-        logger.info("Started train+generate background task for persona=%s job=%s", persona.id, job.id)
-    else:
-        # Persona already has a trained LoRA — just generate
+        logger.info("Started train+generate task for persona=%s job=%s", persona.id, job.id)
+    elif persona.status == PersonaStatus.ready:
+        # Already trained — go straight to generation
         asyncio.create_task(run_generate_only(job.id))
-        logger.info("Started generate background task for job=%s", job.id)
+        logger.info("Started generate task for job=%s", job.id)
+    else:
+        # Tune submitted but training still in progress — leave job queued.
+        # The /webhooks/astria-tune webhook will pick up all queued jobs when training completes.
+        logger.info("Persona %s still training — job %s queued, webhook will start it", persona.id, job.id)
 
     return GenerationJobOut.model_validate(job)
 
@@ -109,9 +110,25 @@ async def get_generation_job(
     result = await db.execute(
         select(GenerationJob)
         .where(GenerationJob.id == job_id, GenerationJob.user_id == user.id)
-        .options(selectinload(GenerationJob.generated_images))
+        .options(
+            selectinload(GenerationJob.generated_images),
+            selectinload(GenerationJob.persona),
+        )
     )
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return GenerationJobDetailOut.model_validate(job)
+
+    out = GenerationJobDetailOut.model_validate(job)
+
+    # Compute phase so the app can show the right progress message
+    if job.status == GenerationStatus.completed:
+        out.phase = "completed"
+    elif job.status == GenerationStatus.failed:
+        out.phase = "failed"
+    elif job.persona and job.persona.status in (PersonaStatus.processing, PersonaStatus.uploading):
+        out.phase = "training"
+    else:
+        out.phase = "generating"
+
+    return out

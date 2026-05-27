@@ -32,3 +32,7 @@ class GenerationJobOut(BaseModel):
 
 class GenerationJobDetailOut(GenerationJobOut):
     generated_images: list[GeneratedImageOut] = []
+    # "training" → persona LoRA is being trained
+    # "generating" → prompt submitted to Astria, images being rendered
+    # "completed" / "failed" → terminal states
+    phase: str = "generating"
