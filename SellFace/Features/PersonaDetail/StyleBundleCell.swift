@@ -22,7 +22,6 @@ final class StyleBundleCell: UICollectionViewCell {
         return iv
     }()
 
-    private var imageLoadTask: Task<Void, Never>?
 
     private let creatingBadge: UILabel = {
         let l = UILabel()
@@ -117,8 +116,6 @@ final class StyleBundleCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        imageLoadTask?.cancel()
-        imageLoadTask = nil
         generatedImageView.image = nil
         generatedImageView.isHidden = true
         iconImageView.isHidden = false
@@ -130,6 +127,7 @@ final class StyleBundleCell: UICollectionViewCell {
 
     private func setupUI() {
         card.translatesAutoresizingMaskIntoConstraints = false
+        card.clipsToBounds = true  // clips generatedImageView to card's corner radius
         contentView.addSubview(card)
         contentView.addSubview(nameLabel)
         contentView.addSubview(oldPriceLabel)
@@ -201,16 +199,17 @@ final class StyleBundleCell: UICollectionViewCell {
 
     // MARK: - Configure
 
-    func configure(with bundle: StyleBundle, isFirstPurchase: Bool, isGenerating: Bool) {
+    func configure(with bundle: StyleBundle, isFirstPurchase: Bool, isGenerating: Bool, previewImage: UIImage? = nil) {
         nameLabel.text = bundle.name
         creatingBadge.isHidden = true
         let sym = UIImage.SymbolConfiguration(pointSize: 26, weight: .light)
         iconImageView.image = UIImage(systemName: bundle.previewImageName, withConfiguration: sym)
 
         // ── State 1: Has generated image — show photo, no price ───────────────
-        if let previewUrl = bundle.previewImageUrl {
+        if bundle.previewImageUrl != nil {
             iconImageView.isHidden = true
             generatedImageView.isHidden = false
+            generatedImageView.image = previewImage  // set synchronously — no async, no blink
             shimmerView.stopAnimating(); shimmerView.isHidden = true
             timeEstimateLabel.isHidden = true
             card.layer.borderWidth = 0
@@ -219,7 +218,6 @@ final class StyleBundleCell: UICollectionViewCell {
             taglineLabel.isHidden = true
             priceLabelTopToOldPrice.isActive = false
             priceLabelTopToCard.isActive = true
-            loadPreviewImage(url: previewUrl)
             return
         }
 
@@ -289,15 +287,6 @@ final class StyleBundleCell: UICollectionViewCell {
         }
     }
 
-    private func loadPreviewImage(url urlString: String) {
-        imageLoadTask?.cancel()
-        guard let url = URL(string: urlString) else { return }
-        imageLoadTask = Task { [weak self] in
-            guard let (data, _) = try? await URLSession.shared.data(from: url),
-                  let image = UIImage(data: data) else { return }
-            await MainActor.run { self?.generatedImageView.image = image }
-        }
-    }
 
     override var isHighlighted: Bool {
         didSet { card.animatePress(down: isHighlighted) }

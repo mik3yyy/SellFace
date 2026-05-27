@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 import StoreKit
 
 @MainActor
@@ -8,6 +8,7 @@ final class PersonaDetailViewModel {
 
     private(set) var styleBundles: [StyleBundle] = []
     private(set) var generatingBundleId: String?
+    private var bundlePreviewImages: [String: UIImage] = [:]  // productId → downloaded image
 
     // Per-persona: true only after this persona has had at least one bundle generated
     var hasGeneratedAnyBundle: Bool {
@@ -87,12 +88,15 @@ final class PersonaDetailViewModel {
         onBundlesUpdated?()
     }
 
+    func previewImage(for bundle: StyleBundle) -> UIImage? {
+        bundlePreviewImages[bundle.productId]
+    }
+
     private func fetchBundlePreviews() async {
-        // Only fetch images for bundles the backend told us have completed results
         let indicesToFetch = styleBundles.indices.filter { styleBundles[$0].isCheckingPreview }
         guard !indicesToFetch.isEmpty else { return }
 
-        await withTaskGroup(of: (Int, String?).self) { group in
+        await withTaskGroup(of: (Int, String?, UIImage?).self) { group in
             for i in indicesToFetch {
                 let productId = styleBundles[i].productId
                 let personaId = persona.id
@@ -101,12 +105,20 @@ final class PersonaDetailViewModel {
                         endpoint: .getPersonaResults(personaId: personaId, styleBundleId: productId),
                         responseType: [GeneratedImageResponse].self
                     )
-                    return (i, results?.first?.imageUrl)
+                    guard let urlString = results?.first?.imageUrl,
+                          let url = URL(string: urlString),
+                          let data = try? await URLSession.shared.data(from: url).0,
+                          let image = UIImage(data: data) else {
+                        return (i, nil, nil)
+                    }
+                    return (i, urlString, image)
                 }
             }
-            for await (i, url) in group {
+            for await (i, url, image) in group {
+                let productId = styleBundles[i].productId
                 styleBundles[i].previewImageUrl = url
                 styleBundles[i].isCheckingPreview = false
+                if let image { bundlePreviewImages[productId] = image }
                 onBundlesUpdated?()
             }
         }

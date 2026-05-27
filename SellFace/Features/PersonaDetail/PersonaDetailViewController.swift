@@ -90,7 +90,8 @@ extension PersonaDetailViewController: UICollectionViewDataSource {
         cell.configure(
             with: bundle,
             isFirstPurchase: !viewModel.hasGeneratedAnyBundle,
-            isGenerating: bundle.id == viewModel.generatingBundleId
+            isGenerating: bundle.id == viewModel.generatingBundleId,
+            previewImage: viewModel.previewImage(for: bundle)
         )
         return cell
     }
