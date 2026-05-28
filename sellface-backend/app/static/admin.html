@@ -257,6 +257,22 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* move buttons */
+  .move-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--sublabel);
+    padding: 3px 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    line-height: 1;
+  }
+  .move-btn:hover { background: var(--gold-bg); color: var(--gold); border-color: var(--gold-dim); }
+  .move-btn:disabled { opacity: 0.2; cursor: default; }
+  .move-cell { display: flex; gap: 4px; align-items: center; }
+
   /* edit button */
   .edit-btn {
     background: var(--gold-bg);
@@ -753,10 +769,16 @@ async function loadStyles() {
 function renderStyles(bundles) {
   document.getElementById('stylesTable').innerHTML = `
     <table>
-      <thead><tr><th>#</th><th>Preview</th><th>Name</th><th>Description</th><th>Display Price</th><th>Was</th><th>StoreKit ID</th><th>Active</th><th></th></tr></thead>
-      <tbody>${bundles.map(b => `
+      <thead><tr><th>Order</th><th>Preview</th><th>Name</th><th>Description</th><th>Display Price</th><th>Was</th><th>StoreKit ID</th><th>Active</th><th></th></tr></thead>
+      <tbody>${bundles.map((b, i) => `
         <tr id="style-row-${b.id}">
-          <td class="mono">${b.sort_order}</td>
+          <td>
+            <div class="move-cell">
+              <span class="mono" style="min-width:20px">${b.sort_order}</span>
+              <button class="move-btn" onclick="moveStyle('${b.id}', -1)" ${i === 0 ? 'disabled' : ''} title="Move up">↑</button>
+              <button class="move-btn" onclick="moveStyle('${b.id}', 1)" ${i === bundles.length - 1 ? 'disabled' : ''} title="Move down">↓</button>
+            </div>
+          </td>
           <td>${b.preview_image_url ? `<img class="thumb" src="${esc(b.preview_image_url)}" onclick="openLightbox('${esc(b.preview_image_url)}')" title="Preview"/>` : `<span style="color:var(--sublabel);font-size:18px">◌</span>`}</td>
           <td><strong>${esc(b.name)}</strong></td>
           <td style="color:var(--sublabel);max-width:200px">${esc(b.description)}</td>
@@ -768,6 +790,34 @@ function renderStyles(bundles) {
         </tr>`).join('')}
       </tbody>
     </table>`;
+}
+
+async function moveStyle(id, dir) {
+  const idx = _styles.findIndex(s => s.id === id);
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= _styles.length) return;
+
+  const curr = _styles[idx];
+  const other = _styles[swapIdx];
+  const orderA = curr.sort_order;
+  const orderB = other.sort_order;
+
+  // If orders are equal, nudge current bundle to avoid no-op
+  const newOrderA = orderA !== orderB ? orderB : orderA + dir;
+  const newOrderB = orderA !== orderB ? orderA : orderB;
+
+  try {
+    await Promise.all([
+      fetch(`/admin/styles/${curr.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: newOrderA }) }),
+      fetch(`/admin/styles/${other.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: newOrderB }) }),
+    ]);
+    curr.sort_order = newOrderA;
+    other.sort_order = newOrderB;
+    _styles.sort((a, b) => a.sort_order - b.sort_order);
+    renderStyles(_styles);
+  } catch (e) {
+    alert('Reorder failed: ' + e.message);
+  }
 }
 
 function openEditModal(bundleId) {
