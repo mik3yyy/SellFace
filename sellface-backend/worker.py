@@ -30,7 +30,7 @@ from app.models.persona import Persona, PersonaStatus
 from app.models.generation_job import GenerationJob, GenerationStatus
 from app.models.generated_image import GeneratedImage
 from app.models.user import User
-from app.services import astria_service, cloudinary_service, notification_service
+from app.services import astria_service, cloudinary_service, notification_service, email_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,6 +41,10 @@ logger = logging.getLogger("worker")
 POLL_INTERVAL   = 10   # seconds between DB polls
 STUCK_THRESHOLD = 300  # seconds before a processing job with no prompt_id is retried
 WEBHOOK_FALLBACK_THRESHOLD = 600  # seconds before we check Astria directly as fallback
+
+# Low-balance email alert — sent at most once per 12 hours to avoid spam
+_last_balance_alert: datetime | None = None
+BALANCE_ALERT_COOLDOWN = timedelta(hours=12)
 
 
 async def run_forever():
@@ -138,6 +142,15 @@ async def submit_tune(persona: Persona, job: GenerationJob, settings) -> None:
             await db.commit()
         return
 
+    # Re-read astria_tune_id inside a fresh session right before calling Astria.
+    # This guards against a race where two worker iterations both saw tune_id=None
+    # and are now both about to call create_tune.
+    async with AsyncSessionLocal() as db:
+        fresh = await db.get(Persona, persona.id)
+        if not fresh or fresh.astria_tune_id:
+            logger.info("submit_tune: persona %s already has tune %s — skipping", persona.id, fresh and fresh.astria_tune_id)
+            return
+
     callback_url = ""
     if settings.app_base_url:
         callback_url = f"{settings.app_base_url.rstrip('/')}/webhooks/astria-tune/{persona.id}"
@@ -200,6 +213,7 @@ async def submit_prompt(job: GenerationJob, settings) -> None:
                 j.error_message = str(e)
             await db.commit()
         notification_service.send_job_failed(tokens, job.persona.name)
+        await asyncio.to_thread(email_service.send_job_failed_alert, job.id, job.persona.name, str(e))
         return
 
     async with AsyncSessionLocal() as db:
@@ -209,6 +223,30 @@ async def submit_prompt(job: GenerationJob, settings) -> None:
             j.astria_prompt_id = prompt["id"]
         await db.commit()
     logger.info("Prompt %s submitted for job %s (webhook: %s)", prompt["id"], job.id, callback_url or "none")
+
+    # Check Astria balance after every successful prompt submission
+    await check_astria_balance(settings)
+
+
+async def check_astria_balance(settings) -> None:
+    """Check Astria credit balance and send an email alert if below threshold."""
+    global _last_balance_alert
+
+    now = datetime.now(timezone.utc)
+    if _last_balance_alert and (now - _last_balance_alert) < BALANCE_ALERT_COOLDOWN:
+        return  # already alerted recently
+
+    balance = await asyncio.to_thread(astria_service.get_balance)
+    if balance < 0:
+        return  # endpoint unavailable — skip silently
+
+    threshold = settings.astria_low_balance_threshold
+    logger.info("Astria balance: %.0f credits (threshold: %.0f)", balance, threshold)
+
+    if balance < threshold:
+        _last_balance_alert = now
+        logger.warning("Astria balance LOW: %.0f credits remaining — sending alert", balance)
+        await asyncio.to_thread(email_service.send_low_balance_alert, balance, threshold)
 
 
 async def check_astria_fallback(job: GenerationJob) -> None:

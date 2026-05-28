@@ -309,6 +309,28 @@ def download_image(url: str) -> bytes:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def get_balance() -> float:
+    """
+    Fetch remaining Astria credits.
+    Returns credit count as a float, or -1 if the endpoint is unavailable.
+    """
+    try:
+        response = requests.get(_url("/me"), headers=_headers(), timeout=10)
+        if not response.ok:
+            logger.warning("Astria balance check returned %d", response.status_code)
+            return -1
+        data = response.json()
+        # Astria returns credits at top level or nested — handle both
+        credits = data.get("credits") or data.get("balance") or data.get("num_credits")
+        if credits is None:
+            logger.warning("Astria balance response has no credits field: %s", list(data.keys()))
+            return -1
+        return float(credits)
+    except Exception as e:
+        logger.warning("Astria balance check failed: %s", e)
+        return -1
+
+
 def _raise_for_status(response: requests.Response) -> None:
     if not response.ok:
         body = response.text[:500]

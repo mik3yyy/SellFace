@@ -241,6 +241,36 @@ async def _apply_update(bundle: StyleBundle, body: StyleBundleUpdate, db: AsyncS
     return _bundle_dict(bundle)
 
 
+@router.post("/jobs/retry-failed")
+async def retry_all_failed_jobs(db: AsyncSession = Depends(get_db)):
+    """Reset all failed generation jobs back to queued so the worker retries them."""
+    result = await db.execute(
+        select(GenerationJob).where(GenerationJob.status == GenerationStatus.failed)
+    )
+    jobs = result.scalars().all()
+    for job in jobs:
+        job.status = GenerationStatus.queued
+        job.error_message = None
+        job.astria_prompt_id = None
+    await db.commit()
+    return {"retried": len(jobs), "message": f"{len(jobs)} job(s) queued for retry"}
+
+
+@router.post("/jobs/{job_id}/retry")
+async def retry_job(job_id: str, db: AsyncSession = Depends(get_db)):
+    """Reset a single failed generation job back to queued."""
+    job = (await db.execute(select(GenerationJob).where(GenerationJob.id == job_id))).scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status != GenerationStatus.failed:
+        raise HTTPException(status_code=400, detail=f"Job is '{job.status}', not failed")
+    job.status = GenerationStatus.queued
+    job.error_message = None
+    job.astria_prompt_id = None
+    await db.commit()
+    return {"message": "Job queued for retry", "job_id": job_id}
+
+
 @router.post("/upload-image")
 async def upload_image(file: UploadFile = File(...)):
     """Upload an image to Cloudinary and return its URL. Used by the admin panel."""

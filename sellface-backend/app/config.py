@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     # Public base URL — used to build Astria webhook callback URLs
     app_base_url: str = ""  # e.g. https://sellface-api.onrender.com
 
+    # Email alerts (Gmail SMTP)
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_from_email: str = ""       # e.g. yourname@gmail.com
+    smtp_password: str = ""         # Gmail App Password
+    alert_email: str = "mikeokpechi@gmail.com"
+    astria_low_balance_threshold: float = 200.0  # alert when credits drop below this
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_from_email and self.smtp_password)
+
     # APNs — leave empty to disable push notifications
     apns_key_id: str = ""
     apns_team_id: str = ""

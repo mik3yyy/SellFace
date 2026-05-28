@@ -496,6 +496,7 @@
           <option value="failed">Failed</option>
         </select>
         <button class="refresh-btn" onclick="loadJobs()">↻ Refresh</button>
+        <button class="refresh-btn" id="retryAllBtn" onclick="retryAllFailed()" style="color:var(--amber);border-color:rgba(251,191,36,0.3)">↺ Retry All Failed</button>
       </div>
       <div id="jobsTable"></div>
       <div class="table-footer" id="jobsFooter"></div>
@@ -731,12 +732,15 @@ function renderJobs(rows) {
   if (!rows.length) { document.getElementById('jobsTable').innerHTML = '<div class="empty-state">No jobs found.</div>'; return; }
   document.getElementById('jobsTable').innerHTML = `
     <table>
-      <thead><tr><th>ID</th><th>Status</th><th>Style</th><th>Images</th><th>Thumbnails</th><th>Error</th><th>Created</th><th>Completed</th></tr></thead>
+      <thead><tr><th>ID</th><th>Status</th><th>Style</th><th>Images</th><th>Thumbnails</th><th>Error</th><th>Created</th><th>Completed</th><th></th></tr></thead>
       <tbody>${rows.map(j => {
         const thumbs = (j.images||[]).slice(0, 4).map(img =>
           `<img class="thumb" src="${img.url}" onclick="openLightbox('${img.url}')" title="Generated image"/>`
         ).join('');
         const extra = j.image_count > 4 ? `<span class="thumb-more">+${j.image_count - 4}</span>` : '';
+        const retryBtn = j.status === 'failed'
+          ? `<button class="edit-btn" style="color:var(--amber);border-color:rgba(251,191,36,0.3)" onclick="retryJob('${j.id}', this)">↺ Retry</button>`
+          : '';
         return `
         <tr>
           <td class="mono">${j.id.substring(0,8)}…</td>
@@ -747,10 +751,45 @@ function renderJobs(rows) {
           <td style="color:var(--red);max-width:180px" title="${esc(j.error_message||'')}">${j.error_message ? j.error_message.substring(0,40)+'…' : '—'}</td>
           <td>${fmtDate(j.created_at)}</td>
           <td>${j.completed_at ? fmtDate(j.completed_at) : '—'}</td>
+          <td>${retryBtn}</td>
         </tr>`;
       }).join('')}
       </tbody>
     </table>`;
+}
+
+async function retryJob(jobId, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch(`/admin/jobs/${jobId}/retry`, { method: 'POST' });
+    if (!r.ok) throw new Error(await r.text());
+    btn.textContent = '✓ Queued';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => loadJobs(), 1500);
+  } catch (e) {
+    alert('Retry failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '↺ Retry';
+  }
+}
+
+async function retryAllFailed() {
+  const btn = document.getElementById('retryAllBtn');
+  btn.disabled = true;
+  btn.textContent = 'Retrying…';
+  try {
+    const r = await fetch('/admin/jobs/retry-failed', { method: 'POST' });
+    if (!r.ok) throw new Error(await r.text());
+    const { retried, message } = await r.json();
+    btn.textContent = `✓ ${message}`;
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = '↺ Retry All Failed'; btn.style.color = ''; btn.disabled = false; loadJobs(); }, 2000);
+  } catch (e) {
+    alert('Retry all failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '↺ Retry All Failed';
+  }
 }
 
 // ── Styles ──
