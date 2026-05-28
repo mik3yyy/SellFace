@@ -112,14 +112,17 @@ async def seed_styles(db):
         return  # already seeded
 
     bundles = [
-        dict(name="Professional", description="Sharp business headshots", product_id="com.sellface.style.professional", price="£2.99", old_price="£9.99", preview_image_name="briefcase.fill", sort_order=0),
-        dict(name="Casual", description="Relaxed everyday looks", product_id="com.sellface.style.casual", price="£2.99", old_price="£9.99", preview_image_name="figure.walk", sort_order=1),
-        dict(name="Executive", description="C-suite authority looks", product_id="com.sellface.style.executive", price="£2.99", old_price="£9.99", preview_image_name="star.fill", sort_order=2),
-        dict(name="Creator", description="Standout creator content", product_id="com.sellface.style.creator", price="£2.99", old_price="£9.99", preview_image_name="video.fill", sort_order=3),
-        dict(name="LinkedIn", description="Profile-ready portraits", product_id="com.sellface.style.linkedin", price="£2.99", old_price="£9.99", preview_image_name="person.crop.square.fill", sort_order=4),
-        dict(name="Old Money", description="Classic aristocratic vibes", product_id="com.sellface.style.oldmoney", price="£2.99", old_price="£9.99", preview_image_name="crown.fill", sort_order=5),
-        dict(name="Sales", description="High-trust, high-conversion", product_id="com.sellface.style.sales", price="£2.99", old_price="£9.99", preview_image_name="chart.line.uptrend.xyaxis", sort_order=6),
-        dict(name="Studio", description="Premium studio lighting", product_id="com.sellface.style.studio", price="£2.99", old_price="£9.99", preview_image_name="camera.fill", sort_order=7),
+        dict(name="Professional", description="Sharp business headshots",      product_id="com.sellface.style.professional", price="£2.99", old_price="£9.99", preview_image_name="briefcase.fill",          sort_order=0),
+        dict(name="Casual",       description="Relaxed everyday looks",        product_id="com.sellface.style.casual",        price="£2.99", old_price="£9.99", preview_image_name="figure.walk",              sort_order=1),
+        dict(name="Executive",    description="C-suite authority looks",       product_id="com.sellface.style.executive",     price="£2.99", old_price="£9.99", preview_image_name="star.fill",                sort_order=2),
+        dict(name="Creator",      description="Standout creator content",      product_id="com.sellface.style.creator",       price="£2.99", old_price="£9.99", preview_image_name="video.fill",               sort_order=3),
+        dict(name="LinkedIn",     description="Profile-ready portraits",       product_id="com.sellface.style.linkedin",      price="£2.99", old_price="£9.99", preview_image_name="person.crop.square.fill",  sort_order=4),
+        dict(name="Old Money",    description="Classic aristocratic vibes",    product_id="com.sellface.style.oldmoney",      price="£2.99", old_price="£9.99", preview_image_name="crown.fill",               sort_order=5),
+        dict(name="Studio",       description="Premium studio lighting",       product_id="com.sellface.style.studio",        price="£2.99", old_price="£9.99", preview_image_name="camera.fill",              sort_order=6),
+        dict(name="Corporate",    description="Modern boardroom authority",    product_id="com.sellface.style.corporate",     price="£2.99", old_price="£9.99", preview_image_name="building.columns.fill",    sort_order=7),
+        dict(name="Golden Hour",  description="Warm golden lifestyle look",    product_id="com.sellface.style.goldenhour",    price="£2.99", old_price="£9.99", preview_image_name="sun.horizon.fill",         sort_order=8),
+        dict(name="Neon Nights",  description="Bold neon editorial style",     product_id="com.sellface.style.neonnights",    price="£2.99", old_price="£9.99", preview_image_name="moon.stars.fill",          sort_order=9),
+        dict(name="Academic",     description="Refined intellectual portrait", product_id="com.sellface.style.academic",      price="£2.99", old_price="£9.99", preview_image_name="graduationcap.fill",       sort_order=10),
     ]
     import uuid as _uuid
     for b in bundles:

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 from typing import Optional
 from pydantic import BaseModel
+import asyncio
 import logging
 
 from app.database import AsyncSessionLocal
@@ -12,6 +13,7 @@ from app.models.generation_job import GenerationJob, GenerationStatus
 from app.models.generated_image import GeneratedImage
 from app.models.style_bundle import StyleBundle
 from app.models.persona_image import PersonaImage
+from app.services import cloudinary_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -237,6 +239,18 @@ async def _apply_update(bundle: StyleBundle, body: StyleBundleUpdate, db: AsyncS
     await db.commit()
     await db.refresh(bundle)
     return _bundle_dict(bundle)
+
+
+@router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload an image to Cloudinary and return its URL. Used by the admin panel."""
+    data = await file.read()
+    result = await asyncio.to_thread(
+        cloudinary_service.upload_bytes,
+        data,
+        folder="sellface/admin/previews",
+    )
+    return {"url": result["url"]}
 
 
 def _bundle_dict(b: StyleBundle) -> dict:

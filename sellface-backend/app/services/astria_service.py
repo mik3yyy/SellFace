@@ -65,18 +65,19 @@ STYLE_PROMPTS: dict[str, tuple[str, str]] = {
         "blurry, low quality, formal, suit, tie, boring background, deformed face, bad anatomy, extra fingers, "
         "dull colours, flat lighting, stiff pose, watermark, text, overexposed, amateur",
     ),
-    "linkedin": (
-        "polished LinkedIn profile headshot photograph of {kw}, wearing smart business casual attire such as a "
-        "well-fitted blazer over a collared shirt or blouse in muted professional tones — navy, grey, or white, "
-        "warm genuine confident smile showing approachability and trustworthiness, direct friendly eye contact, "
-        "set against a clean neutral light grey or soft white studio backdrop, even flattering two-point soft box "
-        "studio lighting eliminating harsh shadows, subtle hair light for dimension, catch lights clearly visible "
-        "in both eyes, 85mm portrait lens, sharp focus on the eyes and face, natural skin tones, professional "
-        "headshot photographer quality, approachable credible and likeable, photorealistic 4K",
-        "blurry, low quality, casual, t-shirt, deformed face, bad anatomy, extra fingers, sunglasses, hat, "
-        "outdoor background, dramatic lighting, harsh shadows, watermark, text, overly serious, stern expression, "
-        "too much retouching, plastic skin",
-    ),
+   "linkedin": (
+    "natural LinkedIn profile headshot photograph of {kw}, wearing one of several approachable "
+    "professional outfits — a well-fitted blazer over a simple t-shirt, or a smart casual open-collar "
+    "shirt, or a clean crewneck sweater in soft neutral tones such as navy, grey, white, or sage green, "
+    "no tie required, warm genuine smile that feels real not posed, relaxed confident energy that says "
+    "approachable colleague rather than corporate executive, set against a clean light grey, warm white, "
+    "or softly blurred natural office or cafe window background, even flattering soft box lighting, "
+    "catch lights visible in both eyes, 85mm portrait lens, sharp focus on the face, natural skin tones, "
+    "the kind of photo a real person would actually use on their LinkedIn profile, photorealistic 4K",
+    "blurry, low quality, formal stiff suit and tie, deformed face, bad anatomy, extra fingers, "
+    "sunglasses, hat, harsh shadows, dramatic lighting, dark background, watermark, text, "
+    "overly corporate, boardroom setting, too polished, plastic skin, over-retouched",
+),
     "old money": (
         "distinguished old money aristocratic portrait photograph of {kw}, wearing a heritage Savile Row tailored "
         "tweed blazer or hacking jacket with a fine wool turtleneck or pressed Oxford shirt, a polished signet ring "
@@ -87,18 +88,6 @@ STYLE_PROMPTS: dict[str, tuple[str, str]] = {
         "texture, painterly photorealistic quality, editorial luxury lifestyle photography",
         "blurry, low quality, modern streetwear, casual, sportswear, deformed face, bad anatomy, extra fingers, "
         "cartoon, anime, watermark, text, harsh flash, neon colours, contemporary office background",
-    ),
-    "sales": (
-        "high-trust professional sales portrait photograph of {kw}, wearing a sharp business casual outfit such as "
-        "a fitted blazer over a smart open-collar shirt in warm approachable tones — light blue, white, or soft grey, "
-        "a broad natural confident smile showing genuine warmth and credibility, open and inviting body language with "
-        "a slight forward lean conveying attentiveness, set in a bright modern glass-walled office with blurred "
-        "contemporary workspace in the background, clean bright three-point studio lighting creating an optimistic "
-        "and energetic feel, catch lights in both eyes, 85mm lens at f/2, shallow depth of field with tack-sharp "
-        "face, warm natural skin tones, photorealistic professional headshot quality, the kind of photo that makes "
-        "people immediately trust you and want to do business with you",
-        "blurry, low quality, deformed face, bad anatomy, extra fingers, sunglasses, hat, harsh shadows, "
-        "dark background, stern expression, crossed arms looking closed off, watermark, text, cartoon",
     ),
     "studio": (
         "dramatic high-fashion studio portrait photograph of {kw}, wearing a sleek all-black or monochrome editorial "
@@ -112,6 +101,52 @@ STYLE_PROMPTS: dict[str, tuple[str, str]] = {
         "blurry, low quality, outdoor setting, colourful background, casual clothes, t-shirt, deformed face, "
         "bad anatomy, extra fingers, flat lighting, soft lighting, overexposed, amateur, watermark, text, smiling, "
         "cheerful, bright colours",
+    ),
+    "corporate": (
+        "polished corporate business portrait photograph of {kw}, wearing a well-fitted dark navy or charcoal "
+        "suit with a crisp collared shirt, composed confident expression with a natural slight smile, "
+        "set against a softly blurred modern office interior with floor-to-ceiling windows and city light "
+        "behind, clean three-point studio lighting with balanced fill, catch lights in both eyes, "
+        "85mm portrait lens at f/2, sharp focus on the face, natural professional skin tones, "
+        "suitable for company website, press kit or speaking bio page, photorealistic DSLR quality, 4K",
+        "blurry, low quality, casual, t-shirt, hoodie, deformed face, bad anatomy, extra fingers, "
+        "sunglasses, hat, harsh shadows, dark seamless background, watermark, text, cartoon, overly stern",
+    ),
+    "golden hour": (
+        "luxury golden hour lifestyle portrait photograph of {kw}, wearing an elegant cream linen shirt or "
+        "flowing camel-toned blouse with minimal jewellery, warm glowing sun-kissed complexion, soft relaxed "
+        "expression radiating ease and warmth, set outdoors against a dreamy blurred Italian villa terrace or "
+        "Provence lavender field bathed in rich amber late-afternoon light, hazy soft bokeh with warm cream "
+        "and honey tones, backlit silhouette rim light kissing the hair and shoulders, shot on 85mm at f/1.8, "
+        "warm colour grading with lifted shadows and creamy highlights, editorial luxury lifestyle photography, "
+        "Vogue Living or Kinfolk magazine quality, romantic and aspirational",
+        "blurry, low quality, harsh flash, cold tones, blue tones, grey background, studio backdrop, "
+        "formal suit, tie, deformed face, bad anatomy, extra fingers, flat lighting, overexposed, "
+        "watermark, text, corporate, stiff pose",
+    ),
+    "neon nights": (
+        "bold editorial neon portrait photograph of {kw}, wearing expressive streetwear or avant-garde fashion "
+        "in dark tones — black leather jacket, graphic pieces, or colour-pop statement outfit, fierce confident "
+        "expression with strong eye contact and magnetic energy, set against a deep midnight black background "
+        "with dramatic split colour gel lighting — electric magenta on one side and electric cobalt or cyan on "
+        "the other, sharp rim lighting carving vivid coloured edges on the face and body, bold saturated skin "
+        "tones lit in complementary hues, 35mm lens, high contrast punchy colour grade, editorial "
+        "Dazed and Confused or i-D magazine aesthetic, cinematic Gen Z energy, 4K sharp",
+        "blurry, low quality, natural light, warm tones, bland background, formal suit, deformed face, "
+        "bad anatomy, extra fingers, flat lighting, dull colours, watermark, text, cheerful smile, "
+        "corporate, soft focus, pastel",
+    ),
+    "academic": (
+        "refined academic editorial portrait photograph of {kw}, wearing a soft ivory or sage green cashmere "
+        "turtleneck or tailored corduroy blazer in warm neutral tones, thoughtful intelligent expression with "
+        "a composed gentle gaze suggesting depth and intellectual warmth, set in a beautifully lit study or "
+        "arched stone library with softly blurred leather-bound bookshelves and warm wooden tones behind, "
+        "natural window light from one side creating a gentle soft Rembrandt fall across the face, warm cream "
+        "and ivory tones throughout, 85mm lens at f/2, shallow depth of field, film photography aesthetic with "
+        "subtle grain, New Yorker profile or Oxford faculty portrait quality, timeless and distinguished",
+        "blurry, low quality, harsh flash, neon colours, bold backgrounds, casual sportswear, deformed face, "
+        "bad anatomy, extra fingers, corporate suit, tie, watermark, text, overexposed, flat lighting, "
+        "modern office background, artificial light",
     ),
 }
 

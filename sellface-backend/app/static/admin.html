@@ -533,10 +533,17 @@
     </div>
 
     <div class="field-group">
-      <div class="field-label">Preview Image URL</div>
-      <input class="field-input" id="editImageUrl" type="url" placeholder="https://…"/>
+      <div class="field-label">Preview Image</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <input class="field-input" id="editImageUrl" type="url" placeholder="https://… or upload below" style="flex:1"/>
+        <label style="cursor:pointer;white-space:nowrap">
+          <input type="file" id="uploadFile" accept="image/*" style="display:none" onchange="handleImageUpload(this)"/>
+          <span class="edit-btn" onclick="document.getElementById('uploadFile').click()">⬆ Upload</span>
+        </label>
+      </div>
+      <div id="uploadStatus" style="font-size:11px;color:var(--sublabel);margin-bottom:6px;display:none"></div>
       <img id="editPreview" class="preview-img" alt="preview"/>
-      <div class="modal-hint">Paste any image URL to show a style preview in the app. Cloudinary or direct CDN links work best.</div>
+      <div class="modal-hint">Upload an image directly or paste a URL. Uploaded images go to Cloudinary automatically.</div>
     </div>
 
     <div class="field-group">
@@ -776,6 +783,7 @@ function openEditModal(bundleId) {
   document.getElementById('editActive').checked = b.is_active;
   document.getElementById('editPreview').src = b.preview_image_url || '';
   document.getElementById('editPreview').style.display = b.preview_image_url ? 'block' : 'none';
+  document.getElementById('uploadStatus').style.display = 'none';
   document.getElementById('editModal').classList.add('open');
 }
 
@@ -790,6 +798,31 @@ document.addEventListener('DOMContentLoaded', () => {
     prev.style.display = this.value ? 'block' : 'none';
   });
 });
+
+async function handleImageUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('uploadStatus');
+  status.style.display = 'block';
+  status.style.color = 'var(--sublabel)';
+  status.textContent = '⏳ Uploading…';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch('/admin/upload-image', { method: 'POST', body: form });
+    if (!r.ok) throw new Error(await r.text());
+    const { url } = await r.json();
+    document.getElementById('editImageUrl').value = url;
+    document.getElementById('editPreview').src = url;
+    document.getElementById('editPreview').style.display = 'block';
+    status.style.color = 'var(--green)';
+    status.textContent = '✓ Uploaded successfully';
+  } catch (e) {
+    status.style.color = 'var(--red)';
+    status.textContent = '✗ Upload failed: ' + e.message;
+  }
+  input.value = '';
+}
 
 async function saveStyle() {
   const id = document.getElementById('editId').value;
