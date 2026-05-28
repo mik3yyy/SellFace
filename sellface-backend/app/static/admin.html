@@ -764,7 +764,7 @@ function renderStyles(bundles) {
           <td style="color:var(--sublabel);text-decoration:line-through;font-size:12px">${b.old_price ? esc(b.old_price) : '—'}</td>
           <td class="mono" style="font-size:11px">${esc(b.product_id)}</td>
           <td>${b.is_active ? '<span class="badge badge-ready">Active</span>' : '<span class="badge badge-draft">Inactive</span>'}</td>
-          <td><button class="edit-btn" onclick="openEditModal(${JSON.stringify(esc(b.id))})">Edit</button></td>
+          <td><button class="edit-btn" onclick="openEditModal('${b.id}')">Edit</button></td>
         </tr>`).join('')}
       </tbody>
     </table>`;
