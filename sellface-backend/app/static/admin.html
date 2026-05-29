@@ -816,7 +816,12 @@ function renderStyles(bundles) {
           <td style="color:var(--gold);font-weight:600">${esc(b.price)}</td>
           <td style="color:var(--sublabel);text-decoration:line-through;font-size:12px">${b.old_price ? esc(b.old_price) : '—'}</td>
           <td class="mono" style="font-size:11px">${esc(b.product_id)}</td>
-          <td>${b.is_active ? '<span class="badge badge-ready">Active</span>' : '<span class="badge badge-draft">Inactive</span>'}</td>
+          <td>
+            <button class="edit-btn" onclick="toggleBundle('${b.id}', ${b.is_active}, this)"
+              style="${b.is_active ? '' : 'color:var(--sublabel);border-color:rgba(138,136,152,0.3)'}">
+              ${b.is_active ? '● Visible' : '○ Hidden'}
+            </button>
+          </td>
           <td><button class="edit-btn" onclick="openEditModal('${b.id}')">Edit</button></td>
         </tr>`).join('')}
       </tbody>
@@ -889,6 +894,26 @@ function initDrag() {
       }
     });
   });
+}
+
+async function toggleBundle(id, currentlyActive, btn) {
+  btn.disabled = true;
+  const newState = !currentlyActive;
+  try {
+    const r = await fetch(`/admin/styles/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: newState }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const updated = await r.json();
+    const idx = _styles.findIndex(s => s.id === id);
+    if (idx !== -1) _styles[idx] = updated;
+    renderStyles(_styles);
+  } catch (e) {
+    alert('Toggle failed: ' + e.message);
+    btn.disabled = false;
+  }
 }
 
 function openEditModal(bundleId) {
