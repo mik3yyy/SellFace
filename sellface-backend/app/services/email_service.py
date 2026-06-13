@@ -62,7 +62,32 @@ https://sellface.onrender.com/admin#jobs
     _send(settings.alert_email, subject, body)
 
 
-def _send(to: str, subject: str, body: str) -> None:
+def send_support_request(name: str, email: str, subject: str, message: str) -> None:
+    from app.config import get_settings
+    settings = get_settings()
+
+    if not settings.smtp_configured:
+        logger.warning("SMTP not configured — skipping support request email")
+        return
+
+    email_subject = f"[SellFace Support] {subject} — from {name}"
+    body = f"""\
+New support request received via the SellFace support page.
+
+Name    : {name}
+Email   : {email}
+Subject : {subject}
+
+Message:
+{message}
+
+---
+Reply directly to this email to respond to the user.
+"""
+    _send(settings.alert_email, email_subject, body, reply_to=email)
+
+
+def _send(to: str, subject: str, body: str, reply_to: str = None) -> None:
     from app.config import get_settings
     settings = get_settings()
 
@@ -71,6 +96,8 @@ def _send(to: str, subject: str, body: str) -> None:
         msg["From"] = settings.smtp_from_email
         msg["To"] = to
         msg["Subject"] = subject
+        if reply_to:
+            msg["Reply-To"] = reply_to
         msg.attach(MIMEText(body, "plain"))
 
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SellFace — Support</title>
+<style>
+  :root {
+    --bg:       #07070f;
+    --surface:  #11111c;
+    --surface2: #1c1c2c;
+    --surface3: #26263a;
+    --border:   rgba(200,168,106,0.15);
+    --gold:     #c8a86a;
+    --gold-dim: rgba(200,168,106,0.7);
+    --gold-bg:  rgba(200,168,106,0.08);
+    --gold-glow:rgba(200,168,106,0.12);
+    --label:    #f0eae0;
+    --sublabel: #8a8898;
+    --muted:    #55546a;
+    --green:    #4ade80;
+    --red:      #f87171;
+    --radius:   14px;
+    --font: -apple-system,'SF Pro Rounded','SF Pro Display',BlinkMacSystemFont,sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--label);
+    font-family: var(--font);
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--gold); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Header ───────────────────────────────────── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(7,7,15,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .header-logo-mark {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #c8a86a 0%, #a07840 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 800; color: #07070f;
+    letter-spacing: -0.5px;
+  }
+  .header-logo-text {
+    font-size: 17px; font-weight: 700; color: var(--gold);
+    letter-spacing: 0.3px;
+  }
+  .header-logo-sub {
+    font-size: 11px; color: var(--sublabel); font-weight: 500;
+    margin-left: 4px; padding: 2px 8px;
+    border: 1px solid var(--border); border-radius: 20px;
+    background: var(--gold-bg);
+  }
+  .header-cta {
+    font-size: 13px; font-weight: 600; color: var(--bg);
+    background: var(--gold);
+    padding: 7px 16px; border-radius: 20px;
+    transition: opacity 0.15s;
+  }
+  .header-cta:hover { opacity: 0.85; text-decoration: none; }
+
+  /* ── Hero ─────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 80px 24px 60px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--gold);
+    background: var(--gold-bg); border: 1px solid var(--border);
+    padding: 5px 14px; border-radius: 20px; margin-bottom: 24px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 800;
+    color: var(--label);
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--gold); }
+  .hero p {
+    font-size: 17px; color: var(--sublabel); max-width: 480px; margin: 0 auto 36px;
+  }
+  .hero-actions {
+    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  }
+  .btn-primary {
+    background: var(--gold); color: #07070f;
+    font-size: 15px; font-weight: 700;
+    padding: 13px 28px; border-radius: 12px;
+    border: none; cursor: pointer; transition: opacity 0.15s;
+    display: inline-block;
+  }
+  .btn-primary:hover { opacity: 0.85; text-decoration: none; }
+  .btn-secondary {
+    background: var(--surface2); color: var(--label);
+    font-size: 15px; font-weight: 600;
+    padding: 13px 28px; border-radius: 12px;
+    border: 1px solid var(--border); cursor: pointer;
+    transition: background 0.15s;
+    display: inline-block;
+  }
+  .btn-secondary:hover { background: var(--surface3); text-decoration: none; }
+
+  /* ── Quick Cards ──────────────────────────────── */
+  .quick-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    max-width: 900px;
+    margin: 0 auto 80px;
+    padding: 0 24px;
+  }
+  .quick-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+    display: block;
+  }
+  .quick-card:hover {
+    border-color: var(--gold-dim);
+    background: var(--surface2);
+    text-decoration: none;
+  }
+  .quick-card-icon {
+    font-size: 28px; margin-bottom: 12px;
+  }
+  .quick-card h3 {
+    font-size: 14px; font-weight: 700; color: var(--label); margin-bottom: 6px;
+  }
+  .quick-card p { font-size: 12px; color: var(--sublabel); }
+
+  /* ── Section ──────────────────────────────────── */
+  section { max-width: 760px; margin: 0 auto; padding: 0 24px 80px; }
+  .section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--label); margin-bottom: 8px;
+  }
+  .section-sub {
+    font-size: 15px; color: var(--sublabel); margin-bottom: 40px;
+  }
+
+  /* ── FAQ Accordion ────────────────────────────── */
+  .faq-list { display: flex; flex-direction: column; gap: 10px; }
+  .faq-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .faq-item.open { border-color: rgba(200,168,106,0.35); }
+  .faq-question {
+    width: 100%; background: none; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px;
+    font-size: 15px; font-weight: 600; color: var(--label);
+    font-family: var(--font);
+    text-align: left; gap: 12px;
+  }
+  .faq-question:hover { color: var(--gold); }
+  .faq-chevron {
+    flex-shrink: 0; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.25s, background 0.2s;
+    font-size: 11px; color: var(--gold);
+  }
+  .faq-item.open .faq-chevron {
+    transform: rotate(180deg);
+    background: var(--gold-bg);
+  }
+  .faq-answer {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s;
+    padding: 0 20px;
+  }
+  .faq-item.open .faq-answer { max-height: 300px; padding: 0 20px 20px; }
+  .faq-answer p {
+    font-size: 14px; color: var(--sublabel); line-height: 1.65;
+  }
+  .faq-answer a { color: var(--gold); }
+
+  /* ── Divider ──────────────────────────────────── */
+  .divider {
+    border: none; border-top: 1px solid var(--border);
+    max-width: 760px; margin: 0 auto 80px;
+  }
+
+  /* ── Contact Form ─────────────────────────────── */
+  .contact-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px 36px;
+  }
+  @media (max-width: 500px) { .contact-card { padding: 28px 20px; } }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 520px) { .form-row { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 20px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--sublabel); margin-bottom: 7px; letter-spacing: 0.3px;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px; color: var(--label);
+    font-family: var(--font);
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--gold-dim);
+    background: var(--surface3);
+  }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c8a86a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  .field textarea { resize: vertical; min-height: 130px; }
+  .field select option { background: #1c1c2c; color: #f0eae0; }
+
+  .submit-btn {
+    width: 100%; padding: 14px;
+    background: var(--gold); color: #07070f;
+    font-size: 15px; font-weight: 700; font-family: var(--font);
+    border: none; border-radius: 12px; cursor: pointer;
+    transition: opacity 0.15s;
+    margin-top: 4px;
+  }
+  .submit-btn:hover:not(:disabled) { opacity: 0.85; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Toast ────────────────────────────────────── */
+  .toast {
+    display: none;
+    align-items: center; gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-size: 14px; font-weight: 500;
+    margin-top: 20px;
+    border: 1px solid;
+  }
+  .toast.success {
+    background: rgba(74,222,128,0.08);
+    border-color: rgba(74,222,128,0.25);
+    color: var(--green);
+  }
+  .toast.error {
+    background: rgba(248,113,113,0.08);
+    border-color: rgba(248,113,113,0.25);
+    color: var(--red);
+  }
+  .toast.show { display: flex; }
+  .toast-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── Footer ───────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer span { color: var(--sublabel); }
+  footer a { color: var(--sublabel); }
+  footer a:hover { color: var(--gold); }
+  .footer-links { display: flex; gap: 20px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-logo">
+    <div class="header-logo-mark">S</div>
+    <span class="header-logo-text">SellFace</span>
+    <span class="header-logo-sub">Support</span>
+  </div>
+  <a class="header-cta" href="https://apps.apple.com/app/sellface" target="_blank" rel="noopener">
+    Get the App
+  </a>
+</header>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-badge">✦ Help Center</div>
+  <h1>We're here to <span>help you</span></h1>
+  <p>Find answers to common questions or send us a message — we usually reply within 24 hours.</p>
+  <div class="hero-actions">
+    <a class="btn-primary" href="#contact">Contact Support</a>
+    <a class="btn-secondary" href="#faq">Browse FAQs</a>
+  </div>
+</div>
+
+<!-- Quick Cards -->
+<div class="quick-cards">
+  <a class="quick-card" href="#photos">
+    <div class="quick-card-icon">📸</div>
+    <h3>Photo Tips</h3>
+    <p>What to upload for the best results</p>
+  </a>
+  <a class="quick-card" href="#generation">
+    <div class="quick-card-icon">⏱</div>
+    <h3>Generation Times</h3>
+    <p>How long your photos take to process</p>
+  </a>
+  <a class="quick-card" href="#billing">
+    <div class="quick-card-icon">💳</div>
+    <h3>Billing & Refunds</h3>
+    <p>Purchases, refunds, and subscriptions</p>
+  </a>
+  <a class="quick-card" href="#privacy">
+    <div class="quick-card-icon">🔒</div>
+    <h3>Privacy & Data</h3>
+    <p>How we handle your photos and data</p>
+  </a>
+</div>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="section-label">FAQ</div>
+  <h2 class="section-title">Frequently asked questions</h2>
+  <p class="section-sub">Everything you need to know about SellFace.</p>
+
+  <div class="faq-list">
+
+    <div class="faq-item" id="photos">
+      <button class="faq-question" aria-expanded="false">
+        What kind of photos should I upload?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Upload 10–20 clear, well-lit photos of just yourself — a mix of different expressions, angles, and outfits works best. Make sure your face is clearly visible in each photo. Avoid: sunglasses, hats or hoods, other people in the frame, heavy filters, very dark or blurry shots, and masked/covered faces.</p>
+      </div>
+    </div>
+
+    <div class="faq-item" id="generation">
+      <button class="faq-question" aria-expanded="false">
+        How long does it take to generate my photos?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Most generations complete within 15–30 minutes. You'll receive a push notification as soon as your photos are ready. During busy periods it can occasionally take up to an hour. If it's been more than 2 hours, please <a href="#contact">contact us</a> and we'll investigate.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        How many AI photos will I receive?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Each style pack generates up to 40 unique AI photos. You can swipe through them in the Results screen inside the app and save your favourites directly to your camera roll.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        Can I create personas for more than one person?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Yes! You can create multiple personas within the app — one for each person you'd like to generate photos for. Just tap <strong>+ New Persona</strong> on the home screen to get started with a second profile.</p>
+      </div>
+    </div>
+
+    <div class="faq-item" id="billing">
+      <button class="faq-question" aria-expanded="false">
+        What is your refund policy?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>If your generation fails or you're genuinely unhappy with the results, contact us within 7 days of your purchase and we'll arrange a refund. Purchases are processed by Apple — you can also request a refund directly through Apple at <a href="https://reportaproblem.apple.com" target="_blank" rel="noopener">reportaproblem.apple.com</a>.</p>
+      </div>
+    </div>
+
+    <div class="faq-item" id="privacy">
+      <button class="faq-question" aria-expanded="false">
+        What happens to my uploaded photos?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Your photos are used solely to train your personal AI model. They are stored securely and are never shared with third parties or used to train general AI models. You can delete your account and all associated data at any time directly from within the app.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        How do I delete my account and data?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>Open the SellFace app, go to <strong>Help &amp; Support</strong> from the menu, and tap <strong>Delete Account</strong>. This permanently removes your account, all personas, uploaded photos, and generated images from our servers. The action cannot be undone.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        My generation seems stuck — what should I do?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>First, make sure notifications are enabled for SellFace so you don't miss the alert. If your generation has been pending for more than 2 hours, please <a href="#contact">contact us</a> with your persona name and approximately when you started the generation — we'll get it sorted quickly.</p>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        Which style packs are available?
+        <span class="faq-chevron">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p>We currently offer Professional, Executive, LinkedIn, Corporate, Casual, Creator, Studio, Old Money, Golden Hour, Neon Nights, and Academic styles. New styles are added regularly — make sure your app is updated to see the latest packs.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- Contact Form -->
+<section id="contact">
+  <div class="section-label">Contact</div>
+  <h2 class="section-title">Send us a message</h2>
+  <p class="section-sub">We typically respond within 24 hours on business days.</p>
+
+  <div class="contact-card">
+    <form id="supportForm" novalidate>
+      <div class="form-row">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input type="text" id="name" name="name" placeholder="Jane Smith" required autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" placeholder="jane@example.com" required autocomplete="email">
+        </div>
+      </div>
+      <div class="field">
+        <label for="subject">Category</label>
+        <select id="subject" name="subject" required>
+          <option value="" disabled selected>Select a topic…</option>
+          <option value="Generation issue">Generation issue (photos taking too long / failed)</option>
+          <option value="Photo quality">Photo quality (results don't look right)</option>
+          <option value="Billing & refund">Billing &amp; refund request</option>
+          <option value="Account & privacy">Account &amp; privacy (data deletion)</option>
+          <option value="App bug">App bug or crash</option>
+          <option value="General question">General question</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" placeholder="Tell us what's going on and we'll get back to you as soon as possible…" required></textarea>
+      </div>
+      <button type="submit" class="submit-btn" id="submitBtn">Send Message</button>
+      <div class="toast success" id="toastSuccess">
+        <span class="toast-icon">✓</span>
+        <span>Message sent! We'll get back to you within 24 hours.</span>
+      </div>
+      <div class="toast error" id="toastError">
+        <span class="toast-icon">!</span>
+        <span id="toastErrorMsg">Something went wrong. Please try again or email us directly.</span>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <span>© 2026 SellFace. All rights reserved.</span>
+  <div class="footer-links">
+    <a href="/privacy">Privacy Policy</a>
+    <a href="https://apps.apple.com/app/sellface" target="_blank" rel="noopener">Download on the App Store</a>
+  </div>
+</footer>
+
+<script>
+  // ── FAQ Accordion ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.faq-question').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('.faq-item');
+      const isOpen = item.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.faq-item.open').forEach(i => {
+        i.classList.remove('open');
+        i.querySelector('.faq-question').setAttribute('aria-expanded', 'false');
+      });
+      // Open clicked (if it wasn't already open)
+      if (!isOpen) {
+        item.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  // Open FAQ item if anchor matches its id
+  function openFromHash() {
+    const id = location.hash.slice(1);
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (target && target.classList.contains('faq-item')) {
+      target.classList.add('open');
+      target.querySelector('.faq-question').setAttribute('aria-expanded', 'true');
+      setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+  }
+  openFromHash();
+  window.addEventListener('hashchange', openFromHash);
+
+  // ── Contact Form ───────────────────────────────────────────────────────────
+  const form       = document.getElementById('supportForm');
+  const submitBtn  = document.getElementById('submitBtn');
+  const toastOK    = document.getElementById('toastSuccess');
+  const toastErr   = document.getElementById('toastError');
+  const toastErrMsg= document.getElementById('toastErrorMsg');
+
+  function showToast(el) {
+    toastOK.classList.remove('show');
+    toastErr.classList.remove('show');
+    el.classList.add('show');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name    = form.name.value.trim();
+    const email   = form.email.value.trim();
+    const subject = form.subject.value;
+    const message = form.message.value.trim();
+
+    if (!name || !email || !subject || message.length < 10) {
+      toastErrMsg.textContent = 'Please fill in all fields (message must be at least 10 characters).';
+      showToast(toastErr);
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+
+    try {
+      const res = await fetch('/support/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, subject, message }),
+      });
+
+      if (res.ok) {
+        form.reset();
+        showToast(toastOK);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const detail = data?.detail;
+        toastErrMsg.textContent = typeof detail === 'string'
+          ? detail
+          : 'Something went wrong. Please try again or email us directly.';
+        showToast(toastErr);
+      }
+    } catch {
+      toastErrMsg.textContent = 'Network error. Please check your connection and try again.';
+      showToast(toastErr);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message';
+    }
+  });
+</script>
+</body>
+</html>

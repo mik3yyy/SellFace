@@ -9,7 +9,7 @@ import os
 
 from app.config import get_settings
 from app.database import engine, AsyncSessionLocal
-from app.routers import personas, generation_jobs, styles, devices, admin, webhooks
+from app.routers import personas, generation_jobs, styles, devices, admin, webhooks, analytics, users, support
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,6 +71,9 @@ app.include_router(styles.router)
 app.include_router(devices.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
+app.include_router(analytics.router)
+app.include_router(users.router)
+app.include_router(support.router)
 
 # Serve admin dashboard HTML
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -81,6 +84,13 @@ if os.path.isdir(_static_dir):
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 async def admin_dashboard():
     html_path = os.path.join(os.path.dirname(__file__), "static", "admin.html")
+    with open(html_path) as f:
+        return HTMLResponse(content=f.read())
+
+
+@app.get("/support", response_class=HTMLResponse, include_in_schema=False)
+async def support_page():
+    html_path = os.path.join(os.path.dirname(__file__), "static", "support.html")
     with open(html_path) as f:
         return HTMLResponse(content=f.read())
 
